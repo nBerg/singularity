@@ -1,7 +1,7 @@
 "use strict";
 
 var config = require('./config').config,
-    db =  require('./db').init(),
+    db =  require('./db'),
     fs = require('fs'),
     events = require('events'),
     winston = require('winston'),
@@ -9,13 +9,19 @@ var config = require('./config').config,
     range_check = require('range_check'),
     app = express();
 
-app.db = db;
 app.log = new (winston.Logger)({
   transports: [
     new (winston.transports.Console)({ level: config.log_level })
   ]
 });
 app.log.cli();
+
+if (config.db) {
+  app.db = db.init();
+}
+else {
+  app.log.info('WARNING: No db config found!');
+}
 
 config.plugin_dirs.forEach(function(dir) {
     fs.readdir(dir, function(err, files) {
@@ -99,6 +105,36 @@ app.post('/', function(request, response) {
     response.writeHead(200, { "Content-Type": "text/plain" });
     response.write('received');
     response.end();
+});
+
+app.get('/pr', function(request, response) {
+
+  if (!request.query) {
+    response.writeHead(501, { 'Content-Type': 'text/plain' });
+    response.write('No query params.');
+    response.end();
+    return;
+  }
+
+  else if (!request.query.repo || !request.query.number) {
+    response.writeHead(501, { 'Content-Type': 'text/plain' });
+    response.write('Missing either "repo" or "number" parameters.');
+    response.end();
+    return;
+  }
+
+  app.db.findPull(parseInt(request.query.number), request.query.repo, function(err, item) {
+    if (err) {
+      app.log.error(err);
+      response.writeHead(500, { 'Content-Type': 'text/plain' });
+      response.end();
+    }
+
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.write(JSON.stringify(item));
+    response.end();
+
+  });
 });
 
 var server = app.listen(config.port || 80, function() {
