@@ -101,6 +101,6 @@ app.post('/', function(request, response) {
     response.end();
 });
 
-var server = app.listen(8889, function() {
+var server = app.listen(config.port || 80, function() {
     console.log('Listening on port %d', server.address().port);
 });
