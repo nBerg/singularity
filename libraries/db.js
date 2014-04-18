@@ -59,8 +59,8 @@ exports.init = function(config) {
 		this.updatePull(pull.number, pull.repo, { jobs: pull.jobs});
 	};
 
-	MongoDB.prototype.updateJobStatus = function(job_id, status) {
-		this.connection.pulls.update({ 'jobs.id': job_id }, { $set: { 'jobs.$.status': status }});
+	MongoDB.prototype.updateJobStatus = function(job_id, status, result) {
+		this.connection.pulls.update({ 'jobs.id': job_id }, { $set: { 'jobs.$.status': status, 'jobs.$.result': result }});
 	};
 
 	// inline status methods
