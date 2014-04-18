@@ -326,8 +326,10 @@ GitHub.prototype.handlePullRequest = function(pull) {
     if (pull.action !== undefined) {
         if (pull.action == 'closed') {
             if (pull.pull_request.merged) {
+                this.application.log.debug('pull was merged, skipping');
                 this.application.emit('pull.merged', pull);
             } else {
+                this.application.log.debug('pull was closed, skipping');
                 this.application.emit('pull.closed', pull);
             }
 
@@ -357,6 +359,7 @@ GitHub.prototype.handlePullRequest = function(pull) {
 
     pull.repo = pull.base.repo.name;
     if (this.config.skip_file_listing) {
+        this.application.log.debug('skipping file listing for PR');
         pull.files = [];
         this.application.emit('pull.found', pull);
     } else {
@@ -460,15 +463,19 @@ exports.init = function(config, application) {
         github.createComment(pull, comment);
     });
 
-    events.on('pull_request', function(pull) {
-        github.handlePullRequest(pull);
-    });
-
-    events.on('issue_comment', function(data) {
+    application.on('issue_comment', function(data) {
         github.handleIssueComment(data);
     });
 
-    events.on('push', function(data) {
+    application.on('push', function(data) {
         github.handlePush(data);
+    });
+
+    application.on('pull_request', function(pull) {
+        github.handlePullRequest(pull);
+    });
+
+    events.on('pull_request', function(pull) {
+        github.handlePullRequest(pull);
     });
 };
