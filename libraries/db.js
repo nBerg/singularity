@@ -1,7 +1,10 @@
 "use strict";
 
-var config = require('./config').config.db;
-exports.init = function() {
+exports.init = function(config) {
+
+    if (!config) {
+      return null;
+    }
 
 	// mongo abstraction layer
 	var MongoDB = function() {
