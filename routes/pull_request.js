@@ -1,23 +1,30 @@
 exports.init = function(app, request, response) {
+  var response_obj = {
+    message: 'received',
+    error: false
+  };
+
   if (!request.query) {
-    response.writeHead(501, { 'Content-Type': 'text/plain' });
-    response.write('No query params.');
-    response.end();
+    response_obj.message = 'No query params.';
+    response_obj.error = true;
+    response.send(501, response_obj);
     return;
   }
 
   else if (!request.query.repo || !request.query.number) {
-    response.writeHead(501, { 'Content-Type': 'text/plain' });
-    response.write('Missing either "repo" or "number" parameters.');
-    response.end();
+    response_obj.message = 'missing either "repo" or "number" parameters.';
+    response_obj.error = true;
+    response.send(501, response_obj);
     return;
   }
 
   app.db.findPull(parseInt(request.query.number), request.query.repo, function(err, item) {
     if (err) {
       app.log.error(err);
-      response.writeHead(500, { 'Content-Type': 'text/plain' });
-      response.end();
+      response_obj.message = JSON.stringify(err);
+      response_obj.error = true;
+      response.send(500, response_obj);
+      return;
     }
 
     response.writeHead(200, { 'Content-Type': 'application/json' });
