@@ -295,23 +295,23 @@ Jenkins.prototype.checkJob = function(pull) {
             build.actions[0].parameters.forEach(function(param) {
                 if (param.name == 'JOB' && param.value == job.id) {
                     if (job.status == 'new') {
-                        self.application.db.updateJobStatus(job.id, 'started');
+                        self.application.db.updateJobStatus(job.id, 'started', 'BUILDING');
                         self.application.emit('build.started', job, pull, build.url);
                     }
 
                     if (job.status != 'finished' && !build.building) {
                         if (build.result == 'FAILURE') {
-                            self.application.db.updateJobStatus(job.id, 'finished');
+                            self.application.db.updateJobStatus(job.id, 'finished', build.result);
                             self.application.emit('build.failed', job, pull, build.url + 'console');
 
                             self.processArtifacts(project.name, build, pull);
                         } else if (build.result == 'SUCCESS') {
-                            self.application.db.updateJobStatus(job.id, 'finished');
+                            self.application.db.updateJobStatus(job.id, 'finished', build.result);
                             self.application.emit('build.succeeded', job, pull, build.url);
 
                             self.processArtifacts(project.name, build, pull);
                         } else if (build.result == 'ABORTED') {
-                            self.application.db.updateJobStatus(job.id, 'finished');
+                            self.application.db.updateJobStatus(job.id, 'finished', build.result);
                             self.application.emit('build.aborted', job, pull, build.url);
                         }
                     }
