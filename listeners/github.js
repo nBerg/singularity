@@ -326,8 +326,10 @@ GitHub.prototype.handlePullRequest = function(pull) {
     if (pull.action !== undefined) {
         if (pull.action == 'closed') {
             if (pull.pull_request.merged) {
+                this.application.log.debug('pull was merged, skipping');
                 this.application.emit('pull.merged', pull);
             } else {
+                this.application.log.debug('pull was closed, skipping');
                 this.application.emit('pull.closed', pull);
             }
 
@@ -357,6 +359,7 @@ GitHub.prototype.handlePullRequest = function(pull) {
 
     pull.repo = pull.base.repo.name;
     if (this.config.skip_file_listing) {
+        this.application.log.debug('skipping file listing for PR');
         pull.files = [];
         this.application.emit('pull.found', pull);
     } else {
