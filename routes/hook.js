@@ -6,7 +6,7 @@ var allowed_ips = [ '127.0.0.1' ],
     allowed_ranges = [ '207.97.227.253/32', '50.57.128.197/32', '108.171.174.178/32', '50.57.231.61/32', '204.232.175.64/27', '192.30.252.0/22' ],
     allowed_events = [ 'pull_request', 'issue_comment', 'push' ];
 
-exports.init = function(app, response, request) {
+exports.init = function(app, request, response) {
     if (allowed_ips.indexOf(request.connection.remoteAddress) == -1) {
         var allowed = false;
         for (var i in allowed_ranges) {
@@ -17,17 +17,14 @@ exports.init = function(app, response, request) {
 
         if (!allowed) {
             app.log.debug('Received post from blocked ip: ' + request.connection.remoteAddress);
-            response.writeHead(403, { 'Content-Type': 'text/plain' });
-            response.end();
+            response.send(403, { error: 'not allowed' });
             return;
         }
     }
 
     if (typeof request.headers['x-github-event'] == 'undefined' || allowed_events.indexOf(request.headers['x-github-event']) == -1) {
         app.log.debug('Received post for unsupported event: ' + request.headers['x-github-event']);
-        response.writeHead(501, { 'Content-Type': 'text/plain' });
-        response.write('Unsupported event type');
-        response.end();
+        response.send(501, { error: 'Unsupported event type' });
         return;
     }
 
@@ -41,7 +38,5 @@ exports.init = function(app, response, request) {
         app.emit(request.headers['x-github-event'], JSON.parse(data));
     });
 
-    response.writeHead(200, { "Content-Type": "text/plain" });
-    response.write('received');
-    response.end();
+    response.send(200, { message: 'received' });
 };
