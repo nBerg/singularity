@@ -463,15 +463,19 @@ exports.init = function(config, application) {
         github.createComment(pull, comment);
     });
 
-    events.on('pull_request', function(pull) {
-        github.handlePullRequest(pull);
-    });
-
-    events.on('issue_comment', function(data) {
+    application.on('issue_comment', function(data) {
         github.handleIssueComment(data);
     });
 
-    events.on('push', function(data) {
+    application.on('push', function(data) {
         github.handlePush(data);
+    });
+
+    application.on('pull_request', function(pull) {
+        github.handlePullRequest(pull);
+    });
+
+    events.on('pull_request', function(pull) {
+        github.handlePullRequest(pull);
     });
 };
