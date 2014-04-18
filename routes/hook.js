@@ -7,36 +7,46 @@ var allowed_ips = [ '127.0.0.1' ],
     allowed_events = [ 'pull_request', 'issue_comment', 'push' ];
 
 exports.init = function(app, request, response) {
-    if (allowed_ips.indexOf(request.connection.remoteAddress) == -1) {
-        var allowed = false;
-        for (var i in allowed_ranges) {
-            if (range_check.in_range(request.connection.remoteAddress, allowed_ranges[i])) {
-                allowed = true;
-            }
-        }
 
-        if (!allowed) {
-            app.log.debug('Received post from blocked ip: ' + request.connection.remoteAddress);
-            response.send(403, { error: 'not allowed' });
-            return;
-        }
+  var response_obj = {
+    message: 'received',
+    error: false
+  };
+
+  if (allowed_ips.indexOf(request.connection.remoteAddress) == -1) {
+    var allowed = false;
+    for (var i in allowed_ranges) {
+      if (range_check.in_range(request.connection.remoteAddress, allowed_ranges[i])) {
+        allowed = true;
+      }
     }
 
-    if (typeof request.headers['x-github-event'] == 'undefined' || allowed_events.indexOf(request.headers['x-github-event']) == -1) {
-        app.log.debug('Received post for unsupported event: ' + request.headers['x-github-event']);
-        response.send(501, { error: 'Unsupported event type' });
-        return;
+    if (!allowed) {
+      app.log.debug('Received post from blocked ip: ' + request.connection.remoteAddress);
+      response_obj.message = 'not allowed';
+      response_obj.error = true;
+      response.send(403, response_obj);
+      return;
     }
+  }
 
-    var data = '';
-    request.on('data', function(chunk) {
-        data += chunk.toString();
-    });
+  if (typeof request.headers['x-github-event'] == 'undefined' || allowed_events.indexOf(request.headers['x-github-event']) == -1) {
+    app.log.debug('Received post for unsupported event: ' + request.headers['x-github-event']);
+    response_obj.message = 'unsupported event type';
+    response_obj.error = true;
+    response.send(501, response_obj);
+    return;
+  }
 
-    request.on('end', function() {
-        app.log.debug('Received post for event: ' + request.headers['x-github-event']);
-        app.emit(request.headers['x-github-event'], JSON.parse(data));
-    });
+  var data = '';
+  request.on('data', function(chunk) {
+    data += chunk.toString();
+  });
 
-    response.send(200, { message: 'received' });
+  request.on('end', function() {
+    app.log.debug('Received post for event: ' + request.headers['x-github-event']);
+    app.emit(request.headers['x-github-event'], JSON.parse(data));
+  });
+
+  response.send(200, response_obj);
 };
