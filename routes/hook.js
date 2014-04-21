@@ -2,8 +2,8 @@ var range_check = require('range_check');
 
 // We only want to accept local requests and GitHub requests. See the Service Hooks
 // page of any repo you have admin access to to see the list of GitHub public IPs.
-var allowed_ips = [ '127.0.0.1' ],
-    allowed_events = [ 'pull_request', 'issue_comment', 'push' ],
+var allowed_ips = ['127.0.0.1'],
+    allowed_events = ['pull_request', 'issue_comment', 'push'],
     allowed_ranges = [
         '207.97.227.253/32',
         '50.57.128.197/32',
