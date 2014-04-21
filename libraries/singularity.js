@@ -43,7 +43,7 @@ module.exports = function(config) {
 
           if (pluginEnabled === undefined || pluginEnabled) {
             app.log.info('Loading plugin: ' + pluginName);
-            app.listeners.push(require(filename).init(config.plugins[pluginName], app));
+            app.listeners.push(require(filename).init(config.plugins[pluginName], app).start());
           }
           else {
             app.log.info('Not loading disabled plugin ' + pluginName);

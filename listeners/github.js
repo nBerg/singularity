@@ -6,7 +6,6 @@
 
 var async = require('async'),
     Emitter = require('events').EventEmitter,
-    events = new Emitter(),
     GitHubApi = require('github');
 
 /**
@@ -17,27 +16,69 @@ var async = require('async'),
  * @constructor
  */
 var GitHub = function(config, application, events) {
+  var self = this;
+
   config.api = config.api || {};
 
-  this.config = config;
-  this.application = application;
-  this.events = events;
-  this.api = new GitHubApi({
+  self.config = config;
+  self.application = application;
+  self.events = events || new Emitter();
+  self.api = new GitHubApi({
     version: '3.0.0',
     host: config.api.host || null,
     port: config.api.port || null
   });
 
-  this.api.authenticate(config.auth);
+  self.api.authenticate(config.auth);
+
+  self.application.on('pull.validated', function(pull) {
+    self.processPull(pull);
+  });
+
+  self.application.on('build.started', function(job, pull, build_url) {
+    self.createStatus(job.head, config.user, pull.repo, 'pending', build_url, 'application Build Started');
+  });
+
+  self.application.on('build.failed', function(job, pull, build_url) {
+    self.createStatus(job.head, config.user, pull.repo, 'failure', build_url, 'application Build Failed');
+  });
+
+  self.application.on('build.succeeded', function(job, pull, build_url) {
+    self.createStatus(job.head, config.user, pull.repo, 'success', build_url, 'application Build Succeeded');
+  });
+
+  self.application.on('pull.inline_status', function(pull, sha, file, position, comment) {
+    self.createComment(pull, sha, file, position, comment) ;
+  });
+
+  self.application.on('pull.status', function(pull, comment) {
+    self.createComment(pull, comment);
+  });
+
+  self.application.on('issue_comment', function(data) {
+    self.handleIssueComment(data);
+  });
+
+  self.application.on('push', function(data) {
+    self.handlePush(data);
+  });
+
+  self.application.on('pull_request', function(pull) {
+    self.handlePullRequest(pull);
+  });
+
+  self.events.on('pull_request', function(pull) {
+    self.handlePullRequest(pull);
+  });
 };
 
 /**
  * Sets up the GitHub plugin. Depending on the selecting configs either a webserver
  * will be setup for receiving webhook events or asynchronous polling will be setup.
  *
- * @method setup
+ * @method start
  */
-GitHub.prototype.setup = function() {
+GitHub.prototype.start = function() {
   if (this.config.method === 'hooks') {
     this.checkRepos();
   }
@@ -54,6 +95,8 @@ GitHub.prototype.setup = function() {
       }
     });
   }
+
+  return this;
 };
 
 /**
@@ -446,47 +489,9 @@ GitHub.prototype.handlePush = function(payload) {
   });
 };
 
-exports.init = function(config, application) {
-  var github = new GitHub(config, application, events);
-  github.setup();
-
-  application.on('pull.validated', function(pull) {
-    github.processPull(pull);
-  });
-
-  application.on('build.started', function(job, pull, build_url) {
-    github.createStatus(job.head, config.user, pull.repo, 'pending', build_url, 'application Build Started');
-  });
-
-  application.on('build.failed', function(job, pull, build_url) {
-    github.createStatus(job.head, config.user, pull.repo, 'failure', build_url, 'application Build Failed');
-  });
-
-  application.on('build.succeeded', function(job, pull, build_url) {
-    github.createStatus(job.head, config.user, pull.repo, 'success', build_url, 'application Build Succeeded');
-  });
-
-  application.on('pull.inline_status', function(pull, sha, file, position, comment) {
-    github.createComment(pull, sha, file, position, comment) ;
-  });
-
-  application.on('pull.status', function(pull, comment) {
-    github.createComment(pull, comment);
-  });
-
-  application.on('issue_comment', function(data) {
-    github.handleIssueComment(data);
-  });
-
-  application.on('push', function(data) {
-    github.handlePush(data);
-  });
-
-  application.on('pull_request', function(pull) {
-    github.handlePullRequest(pull);
-  });
-
-  events.on('pull_request', function(pull) {
-    github.handlePullRequest(pull);
-  });
+/**
+ * Utility function to load this "plugin" into the application without having to know the object name
+ */
+exports.init = function(config, application, emitter) {
+  return new GitHub(config, application, emitter);
 };
