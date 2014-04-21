@@ -13,8 +13,9 @@ describe('Github', function() {
 
   describe('handlePush', function(done) {
     it('is called when push event is emitted', function() {
-      var handlePushSpy = sinon.spy(),
-          githubstub = sinon.stub(test.github, 'handlePush', handlePushSpy);
+      var handlePushSpy = sinon.spy();
+
+      sinon.stub(test.github, 'handlePush', handlePushSpy);
 
       test.events.emit('push', 'dummy');
 
@@ -24,8 +25,9 @@ describe('Github', function() {
 
   describe('handleIssueComment', function(done) {
     it('is called when issue_comment event is emitted', function() {
-      var handleIssueCommentSpy = sinon.spy(),
-          githubstub = sinon.stub(test.github, 'handleIssueComment', handleIssueCommentSpy);
+      var handleIssueCommentSpy = sinon.spy();
+
+      sinon.stub(test.github, 'handleIssueComment', handleIssueCommentSpy);
 
       test.events.emit('issue_comment', 'dummy');
 
@@ -35,8 +37,9 @@ describe('Github', function() {
 
   describe('handlePullRequest', function(done) {
     it('reacts properly to pull_request events', function() {
-      var handlePRSpy = sinon.spy(),
-          githubstub = sinon.stub(test.github, 'handlePullRequest', handlePRSpy);
+      var handlePRSpy = sinon.spy();
+
+      sinon.stub(test.github, 'handlePullRequest', handlePRSpy);
 
       test.events.emit('pull_request', 'application_emit');
       test.events.emit('pull_request', 'self_emit');
