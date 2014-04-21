@@ -22,8 +22,8 @@ module.exports = function(config) {
         }
 
         if (!config.plugins) {
-          app.log.info('No plugin configurations found');
-          process.exit(0);
+          app.log.info('No plugin configurations found - skipping');
+          return;
         }
 
         for (var i = 0, l = files.length; i < l; i++) {
