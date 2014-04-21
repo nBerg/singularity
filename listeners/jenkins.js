@@ -29,7 +29,7 @@ var Jenkins = function(config, application) {
  */
 Jenkins.prototype.findUnfinishedJob = function(pull) {
     for (var x in pull.jobs) {
-        if (pull.jobs[x].status != 'finished') {
+        if (pull.jobs[x].status !== 'finished') {
             return pull.jobs[x];
         }
     }
@@ -45,7 +45,7 @@ Jenkins.prototype.findUnfinishedJob = function(pull) {
 Jenkins.prototype.findProjectByRepo = function(repo) {
     var found = null;
     this.config.projects.forEach(function(project) {
-        if (repo == project.repo) {
+        if (repo === project.repo) {
             found = project;
         }
     });
@@ -61,7 +61,7 @@ Jenkins.prototype.findProjectByRepo = function(repo) {
 Jenkins.prototype.setup = function() {
     var self = this;
     async.parallel({
-        'jenkins': function() {
+        jenkins: function() {
             var run_jenkins = function() {
                 self.application.db.findPullsByJobStatus(['new', 'started'], function(err, pull) {
                     if (err) {
@@ -139,7 +139,7 @@ Jenkins.prototype.pullFound = function(pull) {
     var project = this.findProjectByRepo(pull.repo);
 
     if (!project) {
-        this.application.log.error('No jenkins job found for PR', { pull: pull.number, repository: pull.base.repo.fullname || pull.base.repo.name } );
+        this.application.log.error('No jenkins job found for PR', { pull: pull.number, repository: pull.base.repo.fullname || pull.base.repo.name });
         return;
     }
 
@@ -150,7 +150,7 @@ Jenkins.prototype.pullFound = function(pull) {
     }
 
     for (var x in pull.files) {
-        if (!pull.files[x].filename || typeof pull.files[x].filename != 'string') {
+        if (!pull.files[x].filename || typeof pull.files[x].filename !== 'string') {
             continue;
         }
 
@@ -176,12 +176,12 @@ Jenkins.prototype.validatePush = function(push) {
         log_info = { repo: repo, reference: push.ref, head: push.after };
 
     if (!this.config.push_projects) {
-        this.application.log.debug('No push_projects config for jenkins plugin', log_info );
+        this.application.log.debug('No push_projects config for jenkins plugin', log_info);
         return false;
     }
 
     if (!(repo in this.config.push_projects)) {
-        this.application.log.debug('repo not configured for push events', log_info );
+        this.application.log.debug('repo not configured for push events', log_info);
         return false;
     }
 
@@ -288,29 +288,31 @@ Jenkins.prototype.checkJob = function(pull) {
         }
 
         response.body.builds.forEach(function(build) {
-            if (typeof build.actions == 'undefined' || typeof build.actions[0].parameters == 'undefined' || !build.actions[0].parameters) {
+            if (typeof build.actions === 'undefined' || typeof build.actions[0].parameters === 'undefined' || !build.actions[0].parameters) {
                 return;
             }
 
             build.actions[0].parameters.forEach(function(param) {
-                if (param.name == 'JOB' && param.value == job.id) {
-                    if (job.status == 'new') {
+                if (param.name === 'JOB' && param.value === job.id) {
+                    if (job.status === 'new') {
                         self.application.db.updateJobStatus(job.id, 'started', 'BUILDING');
                         self.application.emit('build.started', job, pull, build.url);
                     }
 
-                    if (job.status != 'finished' && !build.building) {
-                        if (build.result == 'FAILURE') {
+                    if (job.status !== 'finished' && !build.building) {
+                        if (build.result === 'FAILURE') {
                             self.application.db.updateJobStatus(job.id, 'finished', build.result);
                             self.application.emit('build.failed', job, pull, build.url + 'console');
 
                             self.processArtifacts(project.name, build, pull);
-                        } else if (build.result == 'SUCCESS') {
+                        }
+                        else if (build.result === 'SUCCESS') {
                             self.application.db.updateJobStatus(job.id, 'finished', build.result);
                             self.application.emit('build.succeeded', job, pull, build.url);
 
                             self.processArtifacts(project.name, build, pull);
-                        } else if (build.result == 'ABORTED') {
+                        }
+                        else if (build.result === 'ABORTED') {
                             self.application.db.updateJobStatus(job.id, 'finished', build.result);
                             self.application.emit('build.aborted', job, pull, build.url);
                         }

@@ -13,7 +13,7 @@ exports.init = function(app, request, response) {
     return;
   }
 
-  [ 'username', 'token', 'organization', 'repo', 'number' ].forEach(function(param) {
+  ['username', 'token', 'organization', 'repo', 'number'].forEach(function(param) {
     if (!request.query[param]) {
       response_obj.error = true;
       response_obj.message = 'missing parameter: ' + param;
@@ -38,9 +38,9 @@ exports.init = function(app, request, response) {
     repo: request.query.repo,
     number: request.query.number,
   }, function(err, res) {
-    if (err || res.error == true) {
+    if (err || res.error === true) {
       response_obj.error = true;
-      response_obj.message = res ? JSON.stringify(res) : JSON.stringify(err)
+      response_obj.message = res ? JSON.stringify(res) : JSON.stringify(err);
       response.send(500, response_obj);
       return;
     }

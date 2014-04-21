@@ -6,7 +6,7 @@ var Logger = require('./log'),
 module.exports = function(config) {
 
   var app = express();
-  app.log = Logger(config.log_level || 'debug');
+  app.log = new Logger(config.log_level || 'debug');
   app.listeners = [];
 
   app.loadListeners = function(directories) {
@@ -41,7 +41,7 @@ module.exports = function(config) {
 
           var pluginEnabled = config.plugins[pluginName].enabled;
 
-          if (pluginEnabled == undefined || pluginEnabled) {
+          if (pluginEnabled === undefined || pluginEnabled) {
             app.log.info('Loading plugin: ' + pluginName);
             app.listeners.push(require(filename).init(config.plugins[pluginName], app));
           }
