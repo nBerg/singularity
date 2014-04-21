@@ -4,8 +4,7 @@
  */
 "use strict";
 
-var http = require('http'),
-    async = require('async'),
+var async = require('async'),
     emitter = require('events').EventEmitter,
     events = new emitter(),
     GitHubApi = require('github');
@@ -64,7 +63,15 @@ GitHub.prototype.setup = function() {
 GitHub.prototype.checkRepos = function() {
     this.application.log.debug('Polling github for new and updated Pull Requests');
 
-    var self = this;
+    var self = this,
+        emitPrFound = function(error, pull) {
+          if (error) {
+            self.application.log.error(error);
+            return;
+          }
+
+          self.events.emit('pull_request', pull);
+        };
     this.config.repos.forEach(function(repo) {
         self.api.pullRequests.getAll({ 'user': self.config.user, 'repo': repo, 'state': 'open' }, function(error, resp) {
             if (error) {
@@ -76,20 +83,13 @@ GitHub.prototype.checkRepos = function() {
                 var pull = resp[i],
                     number = pull.number;
 
-                if (!number || number == 'undefined') {
+                if (!number || number === 'undefined') {
                     continue;
                 }
 
                 // Currently the GitHub API doesn't provide the same information for polling as
                 // it does when requesting a single, specific, pull request. So we have to
-                self.api.pullRequests.get({ 'user': self.config.user, 'repo': repo, 'number': number }, function(error, pull) {
-                    if (error) {
-                        self.application.log.error(error);
-                        return;
-                    }
-
-                    self.events.emit('pull_request', pull);
-                });
+                self.api.pullRequests.get({ 'user': self.config.user, 'repo': repo, 'number': number }, emitPrFound);
             }
         });
     });
@@ -114,7 +114,7 @@ GitHub.prototype.checkFiles = function(pull) {
 
         pull.files = [];
         files.forEach(function(file) {
-            if (!file.filename || file.filename == 'undefined') {
+            if (!file.filename || file.filename === 'undefined') {
                 return;
             }
 
@@ -205,7 +205,7 @@ GitHub.prototype.processPull = function(pull) {
             // Before updating the list of files in db we need to make sure the set of reported lines is saved
             item.files.forEach(function(file) {
                 pull.files.forEach(function(pull_file, i) {
-                    if (pull_file.filename == file.filename) {
+                    if (pull_file.filename === file.filename) {
                         pull.files[i].reported = file.reported;
                     }
                 });
@@ -214,12 +214,12 @@ GitHub.prototype.processPull = function(pull) {
             pull.jobs = item.jobs;
         }
 
-        if (new_pull || pull.head.sha != item.head) {
+        if (new_pull || pull.head.sha !== item.head) {
             self.application.emit('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
             return;
         }
 
-        if (typeof pull.skip_comments != 'undefined' && pull.skip_comments) {
+        if (typeof pull.skip_comments !== 'undefined' && pull.skip_comments) {
             self.application.emit('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
             return;
         }
@@ -231,20 +231,20 @@ GitHub.prototype.processPull = function(pull) {
             per_page: 100
         }, function(error, resp) {
             for (var i in resp) {
-                if (i == 'meta') {
+                if (i === 'meta') {
                     continue;
                 }
 
                 var comment = resp[i];
                 if (
                     self.config.retry_whitelist &&
-                    self.config.retry_whitelist.indexOf(comment.user.login) == -1 &&
-                    comment.user.login != pull.head.user.login
+                    self.config.retry_whitelist.indexOf(comment.user.login) === -1 &&
+                    comment.user.login !== pull.head.user.login
                 ) {
                     continue;
                 }
 
-                if (comment.created_at > item.updated_at && comment.body.indexOf('@' + self.config.auth.username + ' retest') != -1) {
+                if (comment.created_at > item.updated_at && comment.body.indexOf('@' + self.config.auth.username + ' retest') !== -1) {
                     self.application.emit('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
                     return;
                 }
@@ -324,7 +324,7 @@ GitHub.prototype.createComment = function(pull, sha, file, position, comment) {
 GitHub.prototype.handlePullRequest = function(pull) {
     // Check if this came through a webhooks setup
     if (pull.action !== undefined) {
-        if (pull.action == 'closed') {
+        if (pull.action === 'closed') {
             if (pull.pull_request.merged) {
                 this.application.log.debug('pull was merged, skipping');
                 this.application.emit('pull.merged', pull);
@@ -336,7 +336,7 @@ GitHub.prototype.handlePullRequest = function(pull) {
             return;
         }
 
-        if (pull.action != 'synchronize' && pull.action != 'opened') {
+        if (pull.action !== 'synchronize' && pull.action !== 'opened') {
             this.application.log.debug('Not building pull request, action not supported', { pull_number: pull.number, action: pull.action });
             return;
         }
@@ -352,7 +352,7 @@ GitHub.prototype.handlePullRequest = function(pull) {
         return;
     }
 
-    if (pull.body && pull.body.indexOf('@' + this.config.user + ' ignore') != -1) {
+    if (pull.body && pull.body.indexOf('@' + this.config.user + ' ignore') !== -1) {
         this.application.log.debug('Not building pull request, flagged to be ignored', { pull_number: pull.number });
         return;
     }
@@ -381,7 +381,7 @@ GitHub.prototype.handleIssueComment = function(comment) {
         return;
     }
 
-    if (comment.comment.body.indexOf('@' + this.config.auth.username + ' retest') != -1) {
+    if (comment.comment.body.indexOf('@' + this.config.auth.username + ' retest') !== -1) {
         this.application.log.debug('Received retest request for pull', { pull_number: comment.issue.number, repo: comment.repository.name });
 
         var self = this;

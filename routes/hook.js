@@ -3,8 +3,15 @@ var range_check = require('range_check');
 // We only want to accept local requests and GitHub requests. See the Service Hooks
 // page of any repo you have admin access to to see the list of GitHub public IPs.
 var allowed_ips = [ '127.0.0.1' ],
-    allowed_ranges = [ '207.97.227.253/32', '50.57.128.197/32', '108.171.174.178/32', '50.57.231.61/32', '204.232.175.64/27', '192.30.252.0/22' ],
-    allowed_events = [ 'pull_request', 'issue_comment', 'push' ];
+    allowed_events = [ 'pull_request', 'issue_comment', 'push' ],
+    allowed_ranges = [
+        '207.97.227.253/32',
+        '50.57.128.197/32',
+        '108.171.174.178/32',
+        '50.57.231.61/32',
+        '204.232.175.64/27',
+        '192.30.252.0/22'
+    ];
 
 exports.init = function(app, request, response) {
 
@@ -13,7 +20,7 @@ exports.init = function(app, request, response) {
     error: false
   };
 
-  if (allowed_ips.indexOf(request.connection.remoteAddress) == -1) {
+  if (allowed_ips.indexOf(request.connection.remoteAddress) === -1) {
     var allowed = false;
     for (var i in allowed_ranges) {
       if (range_check.in_range(request.connection.remoteAddress, allowed_ranges[i])) {
@@ -30,7 +37,8 @@ exports.init = function(app, request, response) {
     }
   }
 
-  if (typeof request.headers['x-github-event'] == 'undefined' || allowed_events.indexOf(request.headers['x-github-event']) == -1) {
+  if (typeof request.headers['x-github-event'] === 'undefined' ||
+      allowed_events.indexOf(request.headers['x-github-event']) === -1) {
     app.log.debug('Received post for unsupported event: ' + request.headers['x-github-event']);
     response_obj.message = 'unsupported event type';
     response_obj.error = true;

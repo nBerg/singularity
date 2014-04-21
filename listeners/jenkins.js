@@ -29,7 +29,7 @@ var Jenkins = function(config, application) {
  */
 Jenkins.prototype.findUnfinishedJob = function(pull) {
     for (var x in pull.jobs) {
-        if (pull.jobs[x].status != 'finished') {
+        if (pull.jobs[x].status !== 'finished') {
             return pull.jobs[x];
         }
     }
@@ -45,7 +45,7 @@ Jenkins.prototype.findUnfinishedJob = function(pull) {
 Jenkins.prototype.findProjectByRepo = function(repo) {
     var found = null;
     this.config.projects.forEach(function(project) {
-        if (repo == project.repo) {
+        if (repo === project.repo) {
             found = project;
         }
     });
@@ -150,7 +150,7 @@ Jenkins.prototype.pullFound = function(pull) {
     }
 
     for (var x in pull.files) {
-        if (!pull.files[x].filename || typeof pull.files[x].filename != 'string') {
+        if (!pull.files[x].filename || typeof pull.files[x].filename !== 'string') {
             continue;
         }
 
@@ -288,29 +288,29 @@ Jenkins.prototype.checkJob = function(pull) {
         }
 
         response.body.builds.forEach(function(build) {
-            if (typeof build.actions == 'undefined' || typeof build.actions[0].parameters == 'undefined' || !build.actions[0].parameters) {
+            if (typeof build.actions === 'undefined' || typeof build.actions[0].parameters === 'undefined' || !build.actions[0].parameters) {
                 return;
             }
 
             build.actions[0].parameters.forEach(function(param) {
-                if (param.name == 'JOB' && param.value == job.id) {
-                    if (job.status == 'new') {
+                if (param.name === 'JOB' && param.value === job.id) {
+                    if (job.status === 'new') {
                         self.application.db.updateJobStatus(job.id, 'started', 'BUILDING');
                         self.application.emit('build.started', job, pull, build.url);
                     }
 
-                    if (job.status != 'finished' && !build.building) {
-                        if (build.result == 'FAILURE') {
+                    if (job.status !== 'finished' && !build.building) {
+                        if (build.result === 'FAILURE') {
                             self.application.db.updateJobStatus(job.id, 'finished', build.result);
                             self.application.emit('build.failed', job, pull, build.url + 'console');
 
                             self.processArtifacts(project.name, build, pull);
-                        } else if (build.result == 'SUCCESS') {
+                        } else if (build.result === 'SUCCESS') {
                             self.application.db.updateJobStatus(job.id, 'finished', build.result);
                             self.application.emit('build.succeeded', job, pull, build.url);
 
                             self.processArtifacts(project.name, build, pull);
-                        } else if (build.result == 'ABORTED') {
+                        } else if (build.result === 'ABORTED') {
                             self.application.db.updateJobStatus(job.id, 'finished', build.result);
                             self.application.emit('build.aborted', job, pull, build.url);
                         }

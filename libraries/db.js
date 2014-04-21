@@ -50,7 +50,7 @@ exports.init = function(config) {
 
 	// job methods
 	MongoDB.prototype.insertJob = function(pull, job) {
-		if (typeof pull.jobs == 'undefined') {
+		if (typeof pull.jobs === 'undefined') {
 			pull.jobs = [];
 		}
 
@@ -127,7 +127,7 @@ exports.init = function(config) {
 				cur_pull;
 
 			result.forEach(function(row) {
-				if(cur_pull != row.number){
+				if(cur_pull !== row.number){
 					if(new_row){
 						new_result.push(new_row);
 					}
