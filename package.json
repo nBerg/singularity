@@ -18,6 +18,9 @@
       "grunt-cli": "~0.1.9",
       "grunt": "0.4.2",
       "grunt-contrib-jshint": "",
-      "grunt-jscs-checker": ""
+      "grunt-jscs-checker": "",
+      "grunt-mocha-test": "~0.10.2",
+      "mocha": "~1.18.2",
+      "sinon": "~1.9.1"
   }
 }

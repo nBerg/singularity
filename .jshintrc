@@ -23,7 +23,9 @@
   "globals": {
     "require": false,
     "define": false,
-    "console": false //candidate for eventual removal
+    "beforeEach": false,
+    "describe": false,
+    "it": false
   },
 
   "node": true

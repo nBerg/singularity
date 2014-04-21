@@ -17,3 +17,4 @@ module.exports = (grunt) ->
 
   grunt.registerTask 'sniff', ['jscs:main']
   grunt.registerTask 'lint', ['jshint', 'jscs:main']
+  grunt.registerTask 'test', ['lint', 'mochaTest']
