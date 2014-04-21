@@ -16,8 +16,42 @@ var request = require('request'),
  * @constructor
  */
 var Jenkins = function(config, application) {
-    this.config = config;
-    this.application = application;
+    var self = this;
+
+    self.config = config;
+    self.application = application;
+
+    self.application.on('push.found', function(push) {
+        self.pushFound(push);
+    });
+
+    self.application.on('pull.processed', function(pull, pull_number, sha, ssh_url, branch, updated_at) {
+        self.buildPull(pull, pull_number, sha, ssh_url, branch, updated_at);
+    });
+
+    self.application.on('pull.found', function(pull) {
+        self.pullFound(pull);
+    });
+
+    self.application.on('build.download_artifact', function(build, pull, artifact) {
+        self.downloadArtifact(build, pull, artifact);
+    });
+
+    self.application.on('build.trigger', function(job_name, url_options) {
+        self.triggerBuild(job_name, url_options, function(error) {
+            if (error) {
+                self.application.log.info('Received error from Jenkins when triggering build', { job_name: job_name, url_options: url_options });
+            }
+        });
+    });
+
+    self.application.on('build.check', function(job_name, callback) {
+        self.checkBuild(job_name, callback);
+    });
+
+    self.application.on('process_artifacts', function(job_name, build, pull) {
+        self.processArtifacts(job_name, build, pull);
+    });
 };
 
 /**
@@ -56,31 +90,33 @@ Jenkins.prototype.findProjectByRepo = function(repo) {
 /**
  * Sets up an asynchronous job that polls the Jenkins API to look for jobs that are finished.
  *
- * @method setup
+ * @method start
  */
-Jenkins.prototype.setup = function() {
-    var self = this;
-    async.parallel({
-        jenkins: function() {
-            var run_jenkins = function() {
-                self.application.db.findPullsByJobStatus(['new', 'started'], function(err, pull) {
-                    if (err) {
-                        self.application.log.error(err);
-                        process.exit(1);
-                    }
+Jenkins.prototype.start = function() {
+  var self = this;
+  async.parallel({
+    jenkins: function() {
+      var run_jenkins = function() {
+        self.application.db.findPullsByJobStatus(['new', 'started'], function(err, pull) {
+          if (err) {
+            self.application.log.error(err);
+            process.exit(1);
+          }
 
-                    if (!pull) {
-                        return;
-                    }
-                    self.checkJob(pull);
-                });
+          if (!pull) {
+            return;
+          }
+          self.checkJob(pull);
+        });
 
-                setTimeout(run_jenkins, self.config.frequency);
-            };
+        setTimeout(run_jenkins, self.config.frequency);
+      };
 
-            run_jenkins();
-        }
-    });
+      run_jenkins();
+    }
+  });
+
+  return this;
 };
 
 /**
@@ -459,39 +495,9 @@ Jenkins.prototype.downloadArtifact = function(build, pull, artifact) {
     });
 };
 
+/**
+ * Utility function to load this "plugin" into the application without having to know the object name
+ */
 exports.init = function(config, application) {
-    var jenkins = new Jenkins(config, application);
-    jenkins.setup();
-
-    application.on('push.found', function(push) {
-        jenkins.pushFound(push);
-    });
-
-    application.on('pull.processed', function(pull, pull_number, sha, ssh_url, branch, updated_at) {
-        jenkins.buildPull(pull, pull_number, sha, ssh_url, branch, updated_at);
-    });
-
-    application.on('pull.found', function(pull) {
-        jenkins.pullFound(pull);
-    });
-
-    application.on('build.download_artifact', function(build, pull, artifact) {
-        jenkins.downloadArtifact(build, pull, artifact);
-    });
-
-    application.on('build.trigger', function(job_name, url_options) {
-        jenkins.triggerBuild(job_name, url_options, function(error) {
-            if (error) {
-                application.log.info('Received error from Jenkins when triggering build', { job_name: job_name, url_options: url_options });
-            }
-        });
-    });
-
-    application.on('build.check', function(job_name, callback) {
-        jenkins.checkBuild(job_name, callback);
-    });
-
-    application.on('process_artifacts', function(job_name, build, pull) {
-        jenkins.processArtifacts(job_name, build, pull);
-    });
+    return new Jenkins(config, application);
 };
