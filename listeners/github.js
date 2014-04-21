@@ -5,8 +5,8 @@
 "use strict";
 
 var async = require('async'),
-    emitter = require('events').EventEmitter,
-    events = new emitter(),
+    Emitter = require('events').EventEmitter,
+    events = new Emitter(),
     GitHubApi = require('github');
 
 /**
@@ -17,18 +17,18 @@ var async = require('async'),
  * @constructor
  */
 var GitHub = function(config, application, events) {
-    config.api = config.api || {};
+  config.api = config.api || {};
 
-    this.config = config;
-    this.application = application;
-    this.events = events;
-    this.api = new GitHubApi({
-        version: '3.0.0',
-        host: config.api.host || null,
-        port: config.api.port || null
-    });
+  this.config = config;
+  this.application = application;
+  this.events = events;
+  this.api = new GitHubApi({
+    version: '3.0.0',
+    host: config.api.host || null,
+    port: config.api.port || null
+  });
 
-    this.api.authenticate(config.auth);
+  this.api.authenticate(config.auth);
 };
 
 /**
@@ -38,21 +38,22 @@ var GitHub = function(config, application, events) {
  * @method setup
  */
 GitHub.prototype.setup = function() {
-    if (this.config.method === 'hooks') {
-        this.checkRepos();
-    } else {
-        var self = this;
-        async.parallel({
-            'github': function() {
-                var run_github = function() {
-                    self.checkRepos();
-                    setTimeout(run_github, self.config.frequency);
-                };
+  if (this.config.method === 'hooks') {
+    this.checkRepos();
+  }
+  else {
+    var self = this;
+    async.parallel({
+      github: function() {
+        var run_github = function() {
+          self.checkRepos();
+          setTimeout(run_github, self.config.frequency);
+        };
 
-                run_github();
-            }
-        });
-    }
+        run_github();
+      }
+    });
+  }
 };
 
 /**
@@ -61,38 +62,38 @@ GitHub.prototype.setup = function() {
  * @method checkRepos
  */
 GitHub.prototype.checkRepos = function() {
-    this.application.log.debug('Polling github for new and updated Pull Requests');
+  this.application.log.debug('Polling github for new and updated Pull Requests');
 
-    var self = this,
-        emitPrFound = function(error, pull) {
-          if (error) {
-            self.application.log.error(error);
-            return;
-          }
+  var self = this,
+      emitPrFound = function(error, pull) {
+        if (error) {
+          self.application.log.error(error);
+          return;
+        }
 
-          self.events.emit('pull_request', pull);
-        };
-    this.config.repos.forEach(function(repo) {
-        self.api.pullRequests.getAll({ 'user': self.config.user, 'repo': repo, 'state': 'open' }, function(error, resp) {
-            if (error) {
-                self.application.log.error(error);
-                return;
-            }
+        self.events.emit('pull_request', pull);
+      };
+  this.config.repos.forEach(function(repo) {
+    self.api.pullRequests.getAll({ user: self.config.user, repo: repo, state: 'open' }, function(error, resp) {
+      if (error) {
+        self.application.log.error(error);
+        return;
+      }
 
-            for (var i in resp) {
-                var pull = resp[i],
-                    number = pull.number;
+      for (var i in resp) {
+        var pull = resp[i],
+        number = pull.number;
 
-                if (!number || number === 'undefined') {
-                    continue;
-                }
+        if (!number || number === 'undefined') {
+          continue;
+        }
 
-                // Currently the GitHub API doesn't provide the same information for polling as
-                // it does when requesting a single, specific, pull request. So we have to
-                self.api.pullRequests.get({ 'user': self.config.user, 'repo': repo, 'number': number }, emitPrFound);
-            }
-        });
+        // Currently the GitHub API doesn't provide the same information for polling as
+        // it does when requesting a single, specific, pull request. So we have to
+        self.api.pullRequests.get({user: self.config.user, repo: repo, number: number}, emitPrFound);
+      }
     });
+  });
 };
 
 /**
@@ -103,73 +104,77 @@ GitHub.prototype.checkRepos = function() {
  * @param pull {Object}
  */
 GitHub.prototype.checkFiles = function(pull) {
-    this.application.log.debug('Checking files for pull request', { pull_number: pull.number, repo: pull.repo });
+  this.application.log.debug('Checking files for pull request', { pull_number: pull.number, repo: pull.repo });
 
-    var self = this;
-    this.api.pullRequests.getFiles({ 'user': this.config.user, 'repo': pull.repo, 'number': pull.number }, function(err, files) {
-        if (err) {
-            self.application.log.error(err);
-            return;
-        }
+  var self = this;
+  this.api.pullRequests.getFiles({ user: this.config.user, repo: pull.repo, number: pull.number }, function(err, files) {
+    if (err) {
+      self.application.log.error(err);
+      return;
+    }
 
-        pull.files = [];
-        files.forEach(function(file) {
-            if (!file.filename || file.filename === 'undefined') {
-                return;
+    pull.files = [];
+    files.forEach(function(file) {
+      if (!file.filename || file.filename === 'undefined') {
+        return;
+      }
+
+      var start = null,
+          length = null,
+          deletions = [],
+          modified_length,
+          offset = 0,
+          line_number = 0;
+
+      file.ranges = [];
+      file.reported = [];
+      file.sha = file.blob_url.match(/blob\/([^\/]+)/)[1];
+
+      // The GitHub API doesn't return the actual patch when it's exceedingly large
+      if (file.patch) {
+        file.patch.split('\n').forEach(function(line) {
+          var matches = line.match(/^@@ -\d+,\d+ \+(\d+),(\d+) @@/);
+          if (matches) {
+            if (start == null && length == null) {
+              start = parseInt(matches[1], 10);
+              length = parseInt(matches[2], 10);
+              line_number = start;
             }
+            else {
+              // The one is for the line in the diff block containing the line numbers
+              modified_length = 1 + length + deletions.length;
+              file.ranges.push([start, start + length, modified_length, offset, deletions]);
 
-            var start = null,
-                length = null,
-                deletions = [],
-                modified_length,
-                offset = 0,
-                line_number = 0;
-
-            file.ranges = [];
-            file.reported = [];
-            file.sha = file.blob_url.match(/blob\/([^\/]+)/)[1];
-
-            // The GitHub API doesn't return the actual patch when it's exceedingly large
-            if (file.patch) {
-                file.patch.split('\n').forEach(function(line) {
-                    var matches = line.match(/^@@ -\d+,\d+ \+(\d+),(\d+) @@/);
-                    if (matches) {
-                        if (start == null && length == null) {
-                            start = parseInt(matches[1], 10);
-                            length = parseInt(matches[2], 10);
-                            line_number = start;
-                        } else {
-                            // The one is for the line in the diff block containing the line numbers
-                            modified_length = 1 + length + deletions.length;
-                            file.ranges.push([ start, start + length, modified_length, offset, deletions ]);
-
-                            deletions = [];
-                            start = parseInt(matches[1], 10);
-                            length = parseInt(matches[2], 10);
-                            offset += modified_length;
-                            line_number = start;
-                        }
-                    } else if (line.indexOf('-') === 0) {
-                        deletions.push(line_number);
-                    } else {
-                        line_number += 1;
-                    }
-                });
+              deletions = [];
+              start = parseInt(matches[1], 10);
+              length = parseInt(matches[2], 10);
+              offset += modified_length;
+              line_number = start;
             }
-
-            if (start != null && length != null) {
-                file.ranges.push([ start, start + length, 1 + length + deletions.length, offset, deletions ]);
-            }
-
-            pull.files.push(file);
+          }
+          else if (line.indexOf('-') === 0) {
+            deletions.push(line_number);
+          }
+          else {
+            line_number += 1;
+          }
         });
+      }
 
-        if (pull.files.length > 0) {
-            self.application.emit('pull.found', pull);
-        } else {
-            self.application.log.info('Skipping pull request, no modified files found', { pull_number: pull.number, repo: pull.repo });
-        }
+      if (start != null && length != null) {
+        file.ranges.push([start, start + length, 1 + length + deletions.length, offset, deletions]);
+      }
+
+      pull.files.push(file);
     });
+
+    if (pull.files.length > 0) {
+      self.application.emit('pull.found', pull);
+    }
+    else {
+      self.application.log.info('Skipping pull request, no modified files found', { pull_number: pull.number, repo: pull.repo });
+    }
+  });
 };
 
 /**
@@ -181,76 +186,78 @@ GitHub.prototype.checkFiles = function(pull) {
  * @param pull {Object}
  */
 GitHub.prototype.processPull = function(pull) {
-    var self = this;
-    this.application.db.findPull(pull.number, pull.repo, function(error, item) {
-        if (!pull.head || !pull.head.repo) {
-            self.application.log.error('Skipping pull request, invalid payload given', { pull_number: pull.number, repo: pull.repo });
-            return;
+  var self = this;
+  this.application.db.findPull(pull.number, pull.repo, function(error, item) {
+    if (!pull.head || !pull.head.repo) {
+      self.application.log.error('Skipping pull request, invalid payload given', { pull_number: pull.number, repo: pull.repo });
+      return;
+    }
+
+    var new_pull = false,
+        ssh_url = pull.head.repo.ssh_url,
+        branch = pull.head.label.split(':')[1];
+
+    if (!item) {
+      new_pull = true;
+      self.application.db.insertPull(pull, function(err) {
+        if (err) {
+          self.application.log.error(err);
+          process.exit(1);
         }
-
-        var new_pull = false,
-            ssh_url = pull.head.repo.ssh_url,
-            branch = pull.head.label.split(':')[1];
-
-        if (!item) {
-            new_pull = true;
-            self.application.db.insertPull(pull, function(err) {
-                if (err) {
-                    self.application.log.error(err);
-                    process.exit(1);
-                }
-            });
-            pull.jobs = [];
-        } else {
-            // Before updating the list of files in db we need to make sure the set of reported lines is saved
-            item.files.forEach(function(file) {
-                pull.files.forEach(function(pull_file, i) {
-                    if (pull_file.filename === file.filename) {
-                        pull.files[i].reported = file.reported;
-                    }
-                });
-            });
-            self.application.db.updatePull(pull.number, pull.repo, { files: pull.files });
-            pull.jobs = item.jobs;
-        }
-
-        if (new_pull || pull.head.sha !== item.head) {
-            self.application.emit('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
-            return;
-        }
-
-        if (typeof pull.skip_comments !== 'undefined' && pull.skip_comments) {
-            self.application.emit('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
-            return;
-        }
-
-        self.api.issues.getComments({
-            user: self.config.user,
-            repo: pull.repo,
-            number: pull.number,
-            per_page: 100
-        }, function(error, resp) {
-            for (var i in resp) {
-                if (i === 'meta') {
-                    continue;
-                }
-
-                var comment = resp[i];
-                if (
-                    self.config.retry_whitelist &&
-                    self.config.retry_whitelist.indexOf(comment.user.login) === -1 &&
-                    comment.user.login !== pull.head.user.login
-                ) {
-                    continue;
-                }
-
-                if (comment.created_at > item.updated_at && comment.body.indexOf('@' + self.config.auth.username + ' retest') !== -1) {
-                    self.application.emit('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
-                    return;
-                }
-            }
+      });
+      pull.jobs = [];
+    }
+    else {
+      // Before updating the list of files in db we need to make sure the set of reported lines is saved
+      item.files.forEach(function(file) {
+        pull.files.forEach(function(pull_file, i) {
+          if (pull_file.filename === file.filename) {
+            pull.files[i].reported = file.reported;
+          }
         });
+      });
+      self.application.db.updatePull(pull.number, pull.repo, { files: pull.files });
+      pull.jobs = item.jobs;
+    }
+
+    if (new_pull || pull.head.sha !== item.head) {
+      self.application.emit('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
+      return;
+    }
+
+    if (typeof pull.skip_comments !== 'undefined' && pull.skip_comments) {
+      self.application.emit('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
+      return;
+    }
+
+    self.api.issues.getComments({
+      user: self.config.user,
+      repo: pull.repo,
+      number: pull.number,
+      per_page: 100
+    },
+    function(error, resp) {
+      for (var i in resp) {
+        if (i === 'meta') {
+          continue;
+        }
+
+        var comment = resp[i];
+        if (
+          self.config.retry_whitelist &&
+          self.config.retry_whitelist.indexOf(comment.user.login) === -1 &&
+          comment.user.login !== pull.head.user.login
+          ) {
+          continue;
+        }
+
+        if (comment.created_at > item.updated_at && comment.body.indexOf('@' + self.config.auth.username + ' retest') !== -1) {
+          self.application.emit('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
+          return;
+        }
+      }
     });
+  });
 };
 
 /**
@@ -265,22 +272,23 @@ GitHub.prototype.processPull = function(pull) {
  * @param description {String}
  */
 GitHub.prototype.createStatus = function(sha, user, repo, state, build_url, description) {
-    var self = this, args = arguments;
-    self.application.log.info('creating status ' + state + ' for sha ' + sha + ' for build_url ' + build_url);
-    this.api.statuses.create({
-        user: user,
-        repo: repo,
-        sha: sha,
-        state: state,
-        target_url: build_url,
-        description: description
-    }, function(error) {
-        if (error) {
-          self.application.log.error(error);
-          self.application.log.error(args);
-          return;
-        }
-    });
+  var self = this, args = arguments;
+  self.application.log.info('creating status ' + state + ' for sha ' + sha + ' for build_url ' + build_url);
+  this.api.statuses.create({
+      user: user,
+      repo: repo,
+      sha: sha,
+      state: state,
+      target_url: build_url,
+      description: description
+  },
+  function(error) {
+    if (error) {
+      self.application.log.error(error);
+      self.application.log.error(args);
+      return;
+    }
+  });
 };
 
 /**
@@ -294,24 +302,25 @@ GitHub.prototype.createStatus = function(sha, user, repo, state, build_url, desc
  * @param comment {String}
  */
 GitHub.prototype.createComment = function(pull, sha, file, position, comment) {
-    if (!file && !position && !comment) {
-        this.api.issues.createComment({
-            user: this.config.user,
-            repo: pull.repo,
-            number: pull.number,
-            body: sha
-        });
-    } else {
-        this.api.pullRequests.createComment({
-            user: this.config.user,
-            repo: pull.repo,
-            number: pull.number,
-            body: comment,
-            commit_id: sha,
-            path: file,
-            position: position
-        });
-    }
+  if (!file && !position && !comment) {
+    this.api.issues.createComment({
+      user: this.config.user,
+      repo: pull.repo,
+      number: pull.number,
+      body: sha
+    });
+  }
+  else {
+    this.api.pullRequests.createComment({
+      user: this.config.user,
+      repo: pull.repo,
+      number: pull.number,
+      body: comment,
+      commit_id: sha,
+      path: file,
+      position: position
+    });
+  }
 };
 
 /**
@@ -322,49 +331,51 @@ GitHub.prototype.createComment = function(pull, sha, file, position, comment) {
  * @param pull {Object}
  */
 GitHub.prototype.handlePullRequest = function(pull) {
-    // Check if this came through a webhooks setup
-    if (pull.action !== undefined) {
-        if (pull.action === 'closed') {
-            if (pull.pull_request.merged) {
-                this.application.log.debug('pull was merged, skipping');
-                this.application.emit('pull.merged', pull);
-            } else {
-                this.application.log.debug('pull was closed, skipping');
-                this.application.emit('pull.closed', pull);
-            }
+  // Check if this came through a webhooks setup
+  if (pull.action !== undefined) {
+    if (pull.action === 'closed') {
+      if (pull.pull_request.merged) {
+        this.application.log.debug('pull was merged, skipping');
+        this.application.emit('pull.merged', pull);
+      }
+      else {
+        this.application.log.debug('pull was closed, skipping');
+        this.application.emit('pull.closed', pull);
+      }
 
-            return;
-        }
-
-        if (pull.action !== 'synchronize' && pull.action !== 'opened') {
-            this.application.log.debug('Not building pull request, action not supported', { pull_number: pull.number, action: pull.action });
-            return;
-        }
-
-        pull = pull.pull_request;
+      return;
     }
 
-    // During testing there were cases where the mergeable flag was null when using webhooks.
-    // In that case we want to allow the build to be attempted. We only want to prevent it when
-    // the mergeable flag is explicitly set to false.
-    if (pull.mergeable !== undefined && pull.mergeable === false) {
-        this.application.log.debug('Not building pull request, not in mergeable state', { pull_number: pull.number, mergeable: pull.mergeable });
-        return;
+    if (pull.action !== 'synchronize' && pull.action !== 'opened') {
+      this.application.log.debug('Not building pull request, action not supported', { pull_number: pull.number, action: pull.action });
+      return;
     }
 
-    if (pull.body && pull.body.indexOf('@' + this.config.user + ' ignore') !== -1) {
-        this.application.log.debug('Not building pull request, flagged to be ignored', { pull_number: pull.number });
-        return;
-    }
+    pull = pull.pull_request;
+  }
 
-    pull.repo = pull.base.repo.name;
-    if (this.config.skip_file_listing) {
-        this.application.log.debug('skipping file listing for PR');
-        pull.files = [];
-        this.application.emit('pull.found', pull);
-    } else {
-        this.checkFiles(pull);
-    }
+  // During testing there were cases where the mergeable flag was null when using webhooks.
+  // In that case we want to allow the build to be attempted. We only want to prevent it when
+  // the mergeable flag is explicitly set to false.
+  if (pull.mergeable !== undefined && pull.mergeable === false) {
+    this.application.log.debug('Not building pull request, not in mergeable state', { pull_number: pull.number, mergeable: pull.mergeable });
+    return;
+  }
+
+  if (pull.body && pull.body.indexOf('@' + this.config.user + ' ignore') !== -1) {
+    this.application.log.debug('Not building pull request, flagged to be ignored', { pull_number: pull.number });
+    return;
+  }
+
+  pull.repo = pull.base.repo.name;
+  if (this.config.skip_file_listing) {
+    this.application.log.debug('skipping file listing for PR');
+    pull.files = [];
+    this.application.emit('pull.found', pull);
+  }
+  else {
+    this.checkFiles(pull);
+  }
 };
 
 /**
@@ -375,26 +386,26 @@ GitHub.prototype.handlePullRequest = function(pull) {
  * @param comment {Object}
  */
 GitHub.prototype.handleIssueComment = function(comment) {
-    // This event will pick up comments on issues and pull requests but we only care about pull requests
-    if (comment.issue.pull_request.html_url == null) {
-        this.application.log.debug('Ignoring non-pull request issue notification');
+  // This event will pick up comments on issues and pull requests but we only care about pull requests
+  if (comment.issue.pull_request.html_url == null) {
+    this.application.log.debug('Ignoring non-pull request issue notification');
+    return;
+  }
+
+  if (comment.comment.body.indexOf('@' + this.config.auth.username + ' retest') !== -1) {
+    this.application.log.debug('Received retest request for pull', { pull_number: comment.issue.number, repo: comment.repository.name });
+
+    var self = this;
+    this.api.pullRequests.get({user: this.config.user, repo: comment.repository.name, number: comment.issue.number}, function(error, pull) {
+      if (error) {
+        self.application.log.error(error);
         return;
-    }
+      }
 
-    if (comment.comment.body.indexOf('@' + this.config.auth.username + ' retest') !== -1) {
-        this.application.log.debug('Received retest request for pull', { pull_number: comment.issue.number, repo: comment.repository.name });
-
-        var self = this;
-        this.api.pullRequests.get({ 'user': this.config.user, 'repo': comment.repository.name, 'number': comment.issue.number }, function(error, pull) {
-            if (error) {
-                self.application.log.error(error);
-                return;
-            }
-
-            pull.skip_comments = true;
-            self.events.emit('pull_request', pull);
-        });
-    }
+      pull.skip_comments = true;
+      self.events.emit('pull_request', pull);
+    });
+  }
 };
 
 /**
@@ -404,78 +415,78 @@ GitHub.prototype.handleIssueComment = function(comment) {
  * @param payload {Object}
  */
 GitHub.prototype.handlePush = function(payload) {
-    var self = this;
+  var self = this;
 
-    if (!payload.repository.name || !payload.ref || !payload.before || !payload.after || !payload.pusher.name || !payload.pusher.email) {
-        self.application.log.error('Invalid push payload event', payload);
-        return;
+  if (!payload.repository.name || !payload.ref || !payload.before || !payload.after || !payload.pusher.name || !payload.pusher.email) {
+    self.application.log.error('Invalid push payload event', payload);
+    return;
+  }
+
+  self.application.db.findPush(payload.repository.name, payload.ref, payload.after, function(err, item) {
+    var log_item = { repo: payload.repository.name, ref: payload.ref, sha: payload.after };
+
+    if (err) {
+      self.application.log.error(err);
+      return;
     }
 
-    self.application.db.findPush(payload.repository.name, payload.ref, payload.after, function(err, item) {
-        var log_item = { repo: payload.repository.name, ref: payload.ref, sha: payload.after };
+    if (item) {
+      self.application.log.debug('Push event already triggered.', log_item);
+      return;
+    }
 
-        if (err) {
-            self.application.log.error(err);
-            return;
-        }
-
-        if (item) {
-            self.application.log.debug('Push event already triggered.', log_item);
-            return;
-        }
-
-        self.application.log.debug('Push event found', log_item);
-        self.application.db.insertPush(payload, function(err, res) {
-            if (err) {
-                self.application.log.error(err);
-                return;
-            }
-            self.application.emit('push.found', payload);
-        });
+    self.application.log.debug('Push event found', log_item);
+    self.application.db.insertPush(payload, function(err, res) {
+      if (err) {
+        self.application.log.error(err);
+        return;
+      }
+      self.application.emit('push.found', payload);
     });
+  });
 };
 
 exports.init = function(config, application) {
-    var github = new GitHub(config, application, events);
-    github.setup();
+  var github = new GitHub(config, application, events);
+  github.setup();
 
-    application.on('pull.validated', function(pull) {
-        github.processPull(pull);
-    });
+  application.on('pull.validated', function(pull) {
+    github.processPull(pull);
+  });
 
-    application.on('build.started', function(job, pull, build_url) {
-        github.createStatus(job.head, config.user, pull.repo, 'pending', build_url, 'application Build Started');
-    });
+  application.on('build.started', function(job, pull, build_url) {
+    github.createStatus(job.head, config.user, pull.repo, 'pending', build_url, 'application Build Started');
+  });
 
-    application.on('build.failed', function(job, pull, build_url) {
-        github.createStatus(job.head, config.user, pull.repo, 'failure', build_url, 'application Build Failed');
-    });
+  application.on('build.failed', function(job, pull, build_url) {
+    github.createStatus(job.head, config.user, pull.repo, 'failure', build_url, 'application Build Failed');
+  });
 
-    application.on('build.succeeded', function(job, pull, build_url) {
-        github.createStatus(job.head, config.user, pull.repo, 'success', build_url, 'application Build Succeeded');
-    });
+  application.on('build.succeeded', function(job, pull, build_url) {
+    github.createStatus(job.head, config.user, pull.repo, 'success', build_url, 'application Build Succeeded');
+  });
 
-    application.on('pull.inline_status', function(pull, sha, file, position, comment) {
-        github.createComment(pull, sha, file, position, comment) ;
-    });
+  application.on('pull.inline_status', function(pull, sha, file, position, comment) {
+    github.createComment(pull, sha, file, position, comment) ;
+  });
 
-    application.on('pull.status', function(pull, comment) {
-        github.createComment(pull, comment);
-    });
+  application.on('pull.status', function(pull, comment) {
+    github.createComment(pull, comment);
+  });
 
-    application.on('issue_comment', function(data) {
-        github.handleIssueComment(data);
-    });
+  application.on('issue_comment', function(data) {
+    github.handleIssueComment(data);
+  });
 
-    application.on('push', function(data) {
-        github.handlePush(data);
-    });
+  application.on('push', function(data) {
+    github.handlePush(data);
+  });
 
-    application.on('pull_request', function(pull) {
-        github.handlePullRequest(pull);
-    });
+  application.on('pull_request', function(pull) {
+    github.handlePullRequest(pull);
+  });
 
-    events.on('pull_request', function(pull) {
-        github.handlePullRequest(pull);
-    });
+  events.on('pull_request', function(pull) {
+    github.handlePullRequest(pull);
+  });
 };
