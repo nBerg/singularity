@@ -1,6 +1,9 @@
 "use strict";
 
-exports.init = function(config) {
+/**
+ * All callbacks must have 2 args, err & item
+ */
+exports.init = function(config, log) {
 
   if (!config) {
     return null;
@@ -9,6 +12,13 @@ exports.init = function(config) {
   // mongo abstraction layer
   var MongoDB = function() {
     this.connection = require('mongojs').connect(config.auth, config.collections);
+    this.connection.pulls.ensureIndex( { number: 1, repo_id: 1 }, { unique: true, sparse: true }, function(err, res) {
+      if (err) {
+        log.error('db: failed to ensure indices', err);
+        process.exit(1);
+      }
+      log.info( 'db: ensured indices', { indices: res } );
+    });
   };
 
   // push methods
@@ -36,11 +46,13 @@ exports.init = function(config) {
   MongoDB.prototype.insertPull = function(pull, callback) {
     this.connection.pulls.insert({
       number: pull.number,
+      repo_id: pull.base.repo.id,
       repo: pull.repo,
       created_at: pull.created_at,
       updated_at: pull.updated_at,
       head: pull.head.sha,
-      files: pull.files
+      files: pull.files,
+      opening_event: pull
     }, callback);
   };
 
