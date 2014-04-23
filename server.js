@@ -14,8 +14,8 @@ app.post('/', function(request, response) {
   require('./routes/hook').init(app, request, response);
 });
 
-app.get('/pr', function(request, response) {
-  require('./routes/pull_request').init(app, request, response);
+app.get('/pull_requests', function(request, response) {
+  require('./routes/pull_requests').init(app, request, response);
 });
 
 app.post('/merge', function(request, response) {
