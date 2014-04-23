@@ -14,10 +14,10 @@ exports.init = function(config, log) {
     this.connection = require('mongojs').connect(config.auth, config.collections);
     this.connection.pulls.ensureIndex( { number: 1, repo_id: 1 }, { unique: true, sparse: true }, function(err, res) {
       if (err) {
-        log.error('db: failed to ensure indices', err);
+        log.error('db.pulls: failed to ensure indices', err);
         process.exit(1);
       }
-      log.info( 'db: ensured indices', { indices: res } );
+      log.info( 'db.pulls: ensured indices', { indices: res } );
     });
   };
 
@@ -39,6 +39,10 @@ exports.init = function(config, log) {
     this.connection.pulls.findOne({ number: pull_number, repo: pull_repo }, callback);
   };
 
+  MongoDB.prototype.findPullByRepoId = function(pull_number, pull_repo_id, callback) {
+    this.connection.pulls.findOne({ number: pull_number, repo_id: pull_repo }, callback);
+  };
+
   MongoDB.prototype.updatePull = function(pull_number, pull_repo, update_columns) {
     this.connection.pulls.update({ number: pull_number, repo: pull_repo }, { $set: update_columns });
   };
@@ -52,6 +56,8 @@ exports.init = function(config, log) {
       updated_at: pull.updated_at,
       head: pull.head.sha,
       files: pull.files,
+      merged: false,
+      merge_event: null,
       opening_event: pull
     }, callback);
   };
