@@ -5,7 +5,7 @@ var config = require('./config').config,
     Db = require('./libraries/db'),
     app = Singularity(config);
 
-app.db = Db.init(config.db);
+app.db = Db.init(config.db, app.log);
 
 app.loadListeners([__dirname + '/listeners']);
 
