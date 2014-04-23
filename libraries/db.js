@@ -57,7 +57,7 @@ exports.init = function(config, log) {
       head: pull.head.sha,
       files: pull.files,
       merged: false,
-      merge_event: null,
+      merge_result: null,
       opening_event: pull
     }, callback);
   };

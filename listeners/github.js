@@ -380,6 +380,7 @@ GitHub.prototype.handlePullRequest = function(pull) {
       if (pull.pull_request.merged) {
         this.application.log.debug('pull was merged, skipping');
         this.application.emit('pull.merged', pull);
+        this.application.db.updatePull(pull.number, pull.pull_request.base.repo.name, { merged: true });
       }
       else {
         this.application.log.debug('pull was closed, skipping');
