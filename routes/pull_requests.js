@@ -14,7 +14,7 @@ exports.init = function(app) {
       return;
     }
 
-    var statuses = request.query.status && request.query.statuses.split(',') || [ 'open' ];
+    var statuses = request.query.status && request.query.status.split(',') || [ 'open' ];
 
     app.db.findRepoPullsByStatuses(request.query.repo, statuses, request.query.limit, function(err, item) {
       if (err) {
