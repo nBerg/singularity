@@ -57,9 +57,10 @@ exports.init = function(config, log) {
       created_at: pull.created_at,
       updated_at: pull.updated_at,
       head: pull.head.sha,
-      files: pull.files,
       merged: false,
+      status: 'open',
       merge_result: null,
+      files: pull.files,
       opening_event: pull
     }, callback);
   };

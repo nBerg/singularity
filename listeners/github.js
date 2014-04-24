@@ -376,11 +376,15 @@ GitHub.prototype.createComment = function(pull, sha, file, position, comment) {
 GitHub.prototype.handlePullRequest = function(pull) {
   // Check if this came through a webhooks setup
   if (pull.action !== undefined) {
+    var base_repo_name = pull.pull_request.base.repo.name;
+
+    // fundamental difference between 'closed' and 'merged'
+    this.application.db.updatePull(pull.number, base_repo_name, { status: pull.action});
     if (pull.action === 'closed') {
       if (pull.pull_request.merged) {
         this.application.log.debug('pull was merged, skipping');
         this.application.emit('pull.merged', pull);
-        this.application.db.updatePull(pull.number, pull.pull_request.base.repo.name, { merged: true });
+        this.application.db.updatePull(pull.number, base_repo_name, { merged: true });
       }
       else {
         this.application.log.debug('pull was closed, skipping');
