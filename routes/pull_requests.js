@@ -3,13 +3,11 @@ exports.init = function(app) {
 
   route.get('/', function(request, response, next) {
     var response_obj = {
-      message: 'received',
-      error: false
+      pull_requests: []
     };
 
     if (!request.query) {
-      response_obj.message = 'No query params...?';
-      response_obj.error = true;
+      app.log.error('express.js request obj - no query field...?');
       response.send(500, response_obj);
       return;
     }
@@ -18,16 +16,14 @@ exports.init = function(app) {
 
     app.db.findRepoPullsByStatuses(request.query.repo, statuses, request.query.limit, function(err, item) {
       if (err) {
-        app.log.error(err);
-        response_obj.message = JSON.stringify(err);
-        response_obj.error = true;
+        app.log.error('pull_requests query error!', { repo: request.query.repo, statuses: statuses, limit: request.query.limit, err: err });
         response.send(500, response_obj);
         return;
       }
 
-      response.writeHead(200, { 'Content-Type': 'application/json' });
-      response.write(JSON.stringify(item));
-      response.end();
+      response_obj.pull_requests = item;
+
+      response.send(200, response_obj);
     });
   });
 
