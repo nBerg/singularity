@@ -1,25 +1,23 @@
-exports.init = function(app, request, response) {
+exports.init = function(app) {
   var route = require('express').Router(),
       GithubApi = require('github');
 
   route.post('/', function(request, response, next) {
     var response_obj = {
-      message: 'received',
-      error: false
+      merge: {}
     };
 
     if (!request.query) {
-      response_obj.error = true;
-      response_obj.message = 'No parameters given';
+      app.log.error('express.js request obj - no query field...?');
       response.send(501, response_obj);
       return;
     }
 
     ['username', 'token', 'organization', 'repo', 'number'].forEach(function(param) {
       if (!request.query[param]) {
-        response_obj.error = true;
-        response_obj.message = 'missing parameter: ' + param;
+        app.log.error('missing parameter: ' + param);
         response.send(403, response_obj);
+        return;
       }
     });
 
@@ -42,13 +40,14 @@ exports.init = function(app, request, response) {
     },
     function(err, res) {
       if (err || res.error === true) {
-        response_obj.error = true;
-        response_obj.message = res ? JSON.stringify(res) : JSON.stringify(err);
+        app.log.error('query error', { error: err, result: res });
         response.send(500, response_obj);
         return;
       }
 
-      response_obj.message = res;
+      app.db.insertMerge(request.query.organization, request.query.repo, request.query.number, request.query.username, res);
+
+      response_obj.merge = res;
       response.send(200, response_obj);
     });
   });

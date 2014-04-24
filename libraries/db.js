@@ -21,6 +21,16 @@ exports.init = function(config, log) {
     });
   };
 
+  MongoDB.prototype.insertMerge = function(org, repo, pr_number, merger, merge_result, callback) {
+    this.connection.merges.insert({
+      organization: org,
+      repo: repo,
+      number: pr_number,
+      merger: merger,
+      result: merge_result
+    }, callback);
+  };
+
   // push methods
   MongoDB.prototype.findPush = function(repo, ref, head, callback) {
     this.connection.pushes.findOne({ repo: repo, ref: ref, sha: head }, callback);
