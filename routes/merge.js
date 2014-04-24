@@ -45,7 +45,21 @@ exports.init = function(app) {
         return;
       }
 
-      app.db.insertMerge(request.query.organization, request.query.repo, request.query.number, request.query.username, res);
+      var record = {
+        organization: request.query.organization,
+        repo: request.query.repo,
+        number: request.query.number,
+        merger: request.query.username,
+        result: res
+      };
+
+      app.db.insertMerge(record, function(err, res) {
+        if (err) {
+          app.log.error('unable to save merge', { error: err, record: record });
+          response.send(500, response_obj);
+          return;
+        }
+      });
 
       response_obj.merge = res;
       response.send(200, response_obj);

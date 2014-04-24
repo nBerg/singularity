@@ -21,13 +21,13 @@ exports.init = function(config, log) {
     });
   };
 
-  MongoDB.prototype.insertMerge = function(org, repo, pr_number, merger, merge_result, callback) {
+  MongoDB.prototype.insertMerge = function(merge, callback) {
     this.connection.merges.insert({
-      organization: org,
-      repo: repo,
-      number: pr_number,
-      merger: merger,
-      result: merge_result
+      organization: merge.organization,
+      repo: merge.repo,
+      number: merge.number,
+      merger: merge.merger,
+      result: merge.result
     }, callback);
   };
 
