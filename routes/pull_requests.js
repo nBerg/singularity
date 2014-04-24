@@ -8,20 +8,15 @@ exports.init = function(app) {
     };
 
     if (!request.query) {
-      response_obj.message = 'No query params.';
+      response_obj.message = 'No query params...?';
       response_obj.error = true;
-      response.send(501, response_obj);
+      response.send(500, response_obj);
       return;
     }
 
-    else if (!request.query.repo || !request.query.number) {
-      response_obj.message = 'missing either "repo" or "number" parameters.';
-      response_obj.error = true;
-      response.send(501, response_obj);
-      return;
-    }
+    var statuses = request.query.status && request.query.statuses.split(',') || [ 'open' ];
 
-    app.db.findPullByRepoId(request.query.number, request.query.repo, function(err, item) {
+    app.db.findRepoPullsByStatuses(request.query.repo, statuses, request.query.limit, function(err, item) {
       if (err) {
         app.log.error(err);
         response_obj.message = JSON.stringify(err);

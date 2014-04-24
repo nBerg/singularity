@@ -378,13 +378,12 @@ GitHub.prototype.handlePullRequest = function(pull) {
   if (pull.action !== undefined) {
     var base_repo_name = pull.pull_request.base.repo.name;
 
-    // fundamental difference between 'closed' and 'merged'
-    this.application.db.updatePull(pull.number, base_repo_name, { status: pull.action});
     if (pull.action === 'closed') {
+      this.application.db.updatePull(pull.number, base_repo_name, { status: pull.action });
       if (pull.pull_request.merged) {
         this.application.log.debug('pull was merged, skipping');
         this.application.emit('pull.merged', pull);
-        this.application.db.updatePull(pull.number, base_repo_name, { merged: true });
+        this.application.db.updatePull(pull.number, base_repo_name, { status: 'merged' });
       }
       else {
         this.application.log.debug('pull was closed, skipping');
