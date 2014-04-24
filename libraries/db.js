@@ -12,12 +12,12 @@ exports.init = function(config, log) {
   // mongo abstraction layer
   var MongoDB = function() {
     this.connection = require('mongojs').connect(config.auth, config.collections);
-    this.connection.pulls.ensureIndex( { number: 1, repo_id: 1 }, { unique: true, sparse: true }, function(err, res) {
+    this.connection.pulls.ensureIndex({number: 1, repo_id: 1 }, { unique: true, sparse: true }, function(err, res) {
       if (err) {
         log.error('db.pulls: failed to ensure indices', err);
         process.exit(1);
       }
-      log.info( 'db.pulls: ensured indices', { indices: res } );
+      log.info('db.pulls: ensured indices', { indices: res });
     });
   };
 
