@@ -40,7 +40,9 @@ exports.init = function(config, log) {
   };
 
   MongoDB.prototype.findPullByRepoId = function(pull_number, pull_repo_id, callback) {
-    this.connection.pulls.findOne({ number: pull_number, repo_id: pull_repo }, callback);
+    pull_number = parseInt(pull_number);
+    pull_repo_id = parseInt(pull_repo_id);
+    this.connection.pulls.findOne({ number: pull_number, repo_id: pull_repo_id }, callback);
   };
 
   MongoDB.prototype.updatePull = function(pull_number, pull_repo, update_columns) {

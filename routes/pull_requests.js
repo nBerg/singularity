@@ -18,7 +18,7 @@ exports.init = function(app, request, response) {
     return;
   }
 
-  app.db.findPull(parseInt(request.query.number), request.query.repo, function(err, item) {
+  app.db.findPullByRepoId(request.query.number, request.query.repo, function(err, item) {
     if (err) {
       app.log.error(err);
       response_obj.message = JSON.stringify(err);
