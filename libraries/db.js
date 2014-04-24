@@ -1,6 +1,9 @@
 "use strict";
 
-exports.init = function(config) {
+/**
+ * All callbacks must have 2 args, err & item
+ */
+exports.init = function(config, log) {
 
   if (!config) {
     return null;
@@ -9,6 +12,23 @@ exports.init = function(config) {
   // mongo abstraction layer
   var MongoDB = function() {
     this.connection = require('mongojs').connect(config.auth, config.collections);
+    this.connection.pulls.ensureIndex({number: 1, repo_id: 1 }, { unique: true, sparse: true }, function(err, res) {
+      if (err) {
+        log.error('db.pulls: failed to ensure indices', err);
+        process.exit(1);
+      }
+      log.info('db.pulls: ensured indices', { indices: res });
+    });
+  };
+
+  MongoDB.prototype.insertMerge = function(merge, callback) {
+    this.connection.merges.insert({
+      organization: merge.organization,
+      repo: merge.repo,
+      number: merge.number,
+      merger: merge.merger,
+      result: merge.result
+    }, callback);
   };
 
   // push methods
@@ -29,6 +49,12 @@ exports.init = function(config) {
     this.connection.pulls.findOne({ number: pull_number, repo: pull_repo }, callback);
   };
 
+  MongoDB.prototype.findPullByRepoId = function(pull_number, pull_repo_id, callback) {
+    pull_number = parseInt(pull_number);
+    pull_repo_id = parseInt(pull_repo_id);
+    this.connection.pulls.findOne({ number: pull_number, repo_id: pull_repo_id }, callback);
+  };
+
   MongoDB.prototype.updatePull = function(pull_number, pull_repo, update_columns) {
     this.connection.pulls.update({ number: pull_number, repo: pull_repo }, { $set: update_columns });
   };
@@ -36,12 +62,23 @@ exports.init = function(config) {
   MongoDB.prototype.insertPull = function(pull, callback) {
     this.connection.pulls.insert({
       number: pull.number,
+      repo_id: pull.base.repo.id,
       repo: pull.repo,
       created_at: pull.created_at,
       updated_at: pull.updated_at,
       head: pull.head.sha,
-      files: pull.files
+      merged: false,
+      status: 'open',
+      merge_result: null,
+      files: pull.files,
+      opening_event: pull
     }, callback);
+  };
+
+  MongoDB.prototype.findRepoPullsByStatuses = function(repo, statuses, limit, callback) {
+    limit = parseInt(limit) || 8;
+    repo = parseInt(repo);
+    this.connection.pulls.find({ repo_id: repo, status: { $in: statuses } }).limit(limit, callback);
   };
 
   MongoDB.prototype.findPullsByJobStatus = function(statuses, callback) {
