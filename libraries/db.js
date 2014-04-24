@@ -65,8 +65,9 @@ exports.init = function(config, log) {
     }, callback);
   };
 
-  MongoDB.prototype.findRepoPullsByStatuses(repo, statuses, limit, callback) {
-    limit = limit || 8;
+  MongoDB.prototype.findRepoPullsByStatuses = function(repo, statuses, limit, callback) {
+    limit = parseInt(limit) || 8;
+    repo = parseInt(repo);
     this.connection.pulls.find({ repo_id: repo, status: { $in: statuses } }).limit(limit, callback);
   };
 
