@@ -1,4 +1,4 @@
-Singularity
+Singularity [![Build Status](https://travis-ci.org/Barycenter/singularity.svg?branch=master)](https://travis-ci.org/Barycenter/singularity)
 ===========
 
 **All your github payloads are belong to us.**
