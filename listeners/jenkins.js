@@ -221,7 +221,7 @@ Jenkins.prototype.validatePush = function(push) {
         return false;
     }
 
-    if (!this.config.push_projects[repo].project) {
+    if (!this.config.push_projects[repo].name) {
         this.application.log.error('No jenkins project given for repo', log_info);
         return false;
     }
@@ -264,7 +264,7 @@ Jenkins.prototype.pushFound = function(push) {
             return false;
         }
 
-        log_info.jenkins_trigger = { project: project_config.project, branch: branch };
+        log_info.jenkins_trigger = { project: project_config.name, branch: branch };
         self.application.log.info('regex rule matched for push', log_info);
         self.buildPush(push, branch);
 
@@ -290,7 +290,7 @@ Jenkins.prototype.buildPush = function(push, branch) {
             AFTER: push.after,
         };
 
-    self.triggerBuild(self.config.push_projects[repo].project, url_opts, function(error) {
+    self.triggerBuild(self.config.push_projects[repo].name, url_opts, function(error) {
         if (error) {
              self.application.log.error(error);
         }
