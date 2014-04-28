@@ -6,6 +6,7 @@ var Logger = require('./log'),
 module.exports = function(config) {
 
   var app = express();
+
   app.log = new Logger(config.log_level || 'debug');
   app.listeners = [];
 
@@ -51,6 +52,45 @@ module.exports = function(config) {
         }
       });
     });
+  };
+
+  // todo: make config schema not crap
+  app.getConfig = function() {
+    if (!config.plugins) {
+      return {};
+    }
+
+    var selectData = {},
+        configs = config.plugins,
+        formatProjectCfg = function(projects) {
+          if (!projects && !Array.isArray(projects) && !(projects instanceof Object)) {
+            return [];
+          }
+          var ret = [];
+          for (var repo in projects) {
+            ret.push({
+              name: projects[repo].name,
+              repo: !isNaN(parseInt(repo)) ? projects[repo].repo : repo,
+              has_trigger_token: !!projects[repo].token
+            });
+          }
+          return ret;
+        };
+
+    if (configs.github) {
+      selectData.github = {};
+      selectData.github.ci_user = (configs.github.auth) ? configs.github.auth.username : false;
+      selectData.github.repositories = configs.github.repos || [];
+    }
+
+    if (configs.jenkins) {
+      selectData.jenkins = {};
+      selectData.jenkins.has_global_trigger_token = !!configs.jenkins.token;
+      selectData.jenkins.projects = formatProjectCfg(configs.jenkins.projects);
+      selectData.jenkins.push_projects = formatProjectCfg(configs.jenkins.push_projects);
+    }
+
+    return selectData;
   };
 
   return app;
