@@ -15,5 +15,6 @@ A refactored form of SnapInteractive's [Mergeatron](https://github.com/SnapInter
 ###To Come:
 
 - dynamic loading, registering & storing of repos & Jenkins jobs.
+- support for multiple organizations
 - better module structuring
 - proper routing / yavascripts (because I'm not a JS dev)
