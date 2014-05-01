@@ -5,8 +5,36 @@ var Logger = require('./log'),
 
 module.exports = function(config) {
 
-  var app = express();
+  var app = express(),
+      standizeConfig = function(config) {
+        if (!config.plugins) {
+          config.plugins = {};
+        }
 
+        if (!config.plugins.github) {
+          config.plugins.github = {};
+        }
+
+        if (!config.plugins.github.repos) {
+          config.plugins.github.repos = [];
+        }
+
+        if (!config.plugins.jenkins) {
+          config.plugins.jenkins = {};
+        }
+
+        if (!config.plugins.jenkins.projects) {
+          config.plugins.jenkins = [];
+        }
+
+        if (!config.plugins.jenkins.push_projects) {
+          config.plugins.jenkins.push_projects = {};
+        }
+
+        return config;
+      };
+
+  app.config = standizeConfig(config || {});
   app.log = new Logger(config.log_level || 'debug');
   app.listeners = [];
 
@@ -91,6 +119,32 @@ module.exports = function(config) {
     }
 
     return selectData;
+  };
+
+  app.addRepoPRJob = function(params) {
+    if (app.config.plugins.github.repos.indexOf(params.repo) !== -1) {
+      app.log.info('duplicate github repo', params);
+      return false;
+    }
+
+    app.config.plugins.jenkins.projects.forEach(function(project) {
+      if (params.project === project.name || params.repo === project.repo) {
+        app.log.info('duplicate jenkins repo or project', params);
+        return false;
+      }
+    });
+
+    app.config.plugins.repos.push(params.repo);
+    app.config.plugins.jenkins.projects.push({
+      name: params.project,
+      repo: params.repo,
+      token: params.token || false
+    });
+
+    app.emit('singularity.config_updated', app.config);
+    app.log.info('config updated', app.config);
+
+    return true;
   };
 
   return app;

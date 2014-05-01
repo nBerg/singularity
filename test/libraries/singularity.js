@@ -3,38 +3,32 @@ var expect = require('chai').expect,
     Singularity = require('../../libraries/singularity');
 
 describe('Singularity', function() {
-  var test = this;
+  var test = this,
+      checkSparseConfig = function(config) {
+        expect(config).to.have.keys(['github', 'jenkins']);
+
+        expect(config.github).to.have.keys(['ci_user', 'repositories']);
+        expect(config.github.ci_user).to.be.false;
+        assert.isArray(config.github.repositories);
+        expect(config.github.repositories).to.be.empty;
+
+        expect(config.jenkins).to.have.keys(['has_global_trigger_token', 'projects', 'push_projects']);
+        expect(config.jenkins.has_global_trigger_token).to.be.false;
+        assert.isArray(config.jenkins.projects);
+        expect(config.jenkins.projects).to.be.empty;
+        assert.isArray(config.jenkins.push_projects);
+        expect(config.jenkins.push_projects).to.be.empty;
+      };
 
   beforeEach(function() {
     test.config = require('../../config.sample.js').config;
   });
 
   describe('getConfig', function(done) {
-    it('handles empty configs correctly', function() {
-      var bareApp = new Singularity({}),
-          sparserApp = new Singularity({ plugins: {} });
-
-      expect(bareApp.getConfig()).to.be.empty;
-      expect(sparserApp.getConfig()).to.be.empty;
-    });
-
     it('sets defaults correctly', function() {
-      var sparseConfig = { plugins: { github: {}, jenkins: {} } },
-          defaultAppConfig = new Singularity(sparseConfig).getConfig();
+      var defaultAppConfig = new Singularity({}).getConfig();
 
-      expect(defaultAppConfig).to.have.keys(['github', 'jenkins']);
-
-      expect(defaultAppConfig.github).to.have.keys(['ci_user', 'repositories']);
-      expect(defaultAppConfig.github.ci_user).to.be.false;
-      assert.isArray(defaultAppConfig.github.repositories);
-      expect(defaultAppConfig.github.repositories).to.be.empty;
-
-      expect(defaultAppConfig.jenkins).to.have.keys(['has_global_trigger_token', 'projects', 'push_projects']);
-      expect(defaultAppConfig.jenkins.has_global_trigger_token).to.be.false;
-      assert.isArray(defaultAppConfig.jenkins.projects);
-      expect(defaultAppConfig.jenkins.projects).to.be.empty;
-      assert.isArray(defaultAppConfig.jenkins.push_projects);
-      expect(defaultAppConfig.jenkins.push_projects).to.be.empty;
+          checkSparseConfig(defaultAppConfig);
     });
 
     it('filters data correctly', function() {
@@ -69,6 +63,24 @@ describe('Singularity', function() {
       expect(pushProjectCfg.has_trigger_token).to.be.false;
       expect(pushProjectCfg.repo).to.equal('test_repo');
       expect(pushProjectCfg.name).to.equal('test_job');
+    });
+  });
+
+  describe('addRepoPRJob', function() {
+    it('does not update when repo is already in github config', function() {
+
+    });
+
+    it('does not update when repo is already in a jenkins config', function() {
+
+    });
+
+    it('does not update when project is already in a jenkins config', function() {
+
+    });
+
+    it('actually updates properly', function() {
+
     });
   });
 });
