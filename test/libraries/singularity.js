@@ -1,5 +1,6 @@
 var expect = require('chai').expect,
     assert = require('chai').assert,
+    sinon = require('sinon'),
     Singularity = require('../../libraries/singularity');
 
 describe('Singularity', function() {
@@ -26,9 +27,7 @@ describe('Singularity', function() {
 
   describe('getConfig', function(done) {
     it('sets defaults correctly', function() {
-      var defaultAppConfig = new Singularity({}).getConfig();
-
-          checkSparseConfig(defaultAppConfig);
+      checkSparseConfig(new Singularity({}).getConfig());
     });
 
     it('filters data correctly', function() {
@@ -67,12 +66,41 @@ describe('Singularity', function() {
   });
 
   describe('addRepoPRJob', function() {
-    it('does not update when repo is already in github config', function() {
+    var config = {
+          plugins: {
+            github: {
+              repos: ['test_repo']
+            },
+            jenkins: {
+              projects: [
+                {
+                  repo: 'test_repo',
+                  project: 'test_repo_project'
+                },
+                {
+                  repo: 'test_repo2',
+                  project: 'test_repo2_project'
+                }
+              ]
+            }
+          }
+        },
+        app = new Singularity(config);
 
+    it('does not update when repo is already in github config', function() {
+      var logSpy = sinon.spy(),
+          args = { repo: 'test_repo', project: 'test_repo_project' };
+      sinon.stub(app.log, 'info', logSpy);
+      expect(app.addRepoPRJob(args)).to.be.false;
+      assert(logSpy.withArgs('duplicate github repo', args).calledOnce);
     });
 
     it('does not update when repo is already in a jenkins config', function() {
-
+      var logSpy = sinon.spy(),
+          args = { repo: 'test_repo2', project: 'new_test_repo2_project' };
+      sinon.stub(app.log, 'info', logSpy);
+      expect(app.addRepoPRJob(args)).to.be.false;
+      assert(logSpy.withArgs('duplicate github repo', args).calledOnce);
     });
 
     it('does not update when project is already in a jenkins config', function() {
