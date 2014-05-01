@@ -127,14 +127,16 @@ module.exports = function(config) {
       return false;
     }
 
-    app.config.plugins.jenkins.projects.forEach(function(project) {
-      if (params.project === project.name || params.repo === project.repo) {
-        app.log.info('duplicate jenkins repo or project', params);
-        return false;
-      }
+    var duplicate = app.config.plugins.jenkins.projects.some(function(project) {
+      return (params.project === project.name || params.repo === project.repo);
     });
 
-    app.config.plugins.repos.push(params.repo);
+    if (duplicate) {
+      app.log.info('duplicate jenkins repo or project', params);
+      return false;
+    }
+
+    app.config.plugins.github.repos.push(params.repo);
     app.config.plugins.jenkins.projects.push({
       name: params.project,
       repo: params.repo,
