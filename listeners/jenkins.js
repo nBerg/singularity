@@ -283,18 +283,22 @@ Jenkins.prototype.pushFound = function(push) {
 Jenkins.prototype.buildPush = function(push, branch) {
   var self = this,
       repo = push.repository.name,
+      job_id = uuid.v1(),
       url_opts = {
         token: self.config.push_projects[repo].token || self.config.token,
         cause: push.ref + ' updated to ' + push.after,
         BRANCH_NAME: branch,
         BEFORE: push.before,
         AFTER: push.after,
+        JOB: job_id
       };
 
   self.triggerBuild(self.config.push_projects[repo].name, url_opts, function(error) {
     if (error) {
-       self.application.log.error(error);
+      self.application.log.error(error);
     }
+
+    self.application.db.insertPushJob(push, job_id);
   });
 };
 

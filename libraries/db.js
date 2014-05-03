@@ -40,7 +40,11 @@ exports.init = function(config, log) {
     this.connection.pushes.insert({
       repo: push.repository.name,
       ref: push.ref,
-      sha: push.after
+      sha: push.after,
+      job: {
+        id: null,
+        status: null
+      }
     }, callback);
   };
 
@@ -94,6 +98,30 @@ exports.init = function(config, log) {
     pull.jobs.push(job);
 
     this.updatePull(pull.number, pull.repo, { jobs: pull.jobs});
+  };
+
+  MongoDB.prototype.insertPushJob = function(push, job_id) {
+    var query = {
+      ref: push.ref,
+      repo: push.repository.name,
+      sha: push.after
+    };
+    this.findPush(query, function(err, res) {
+      // something went terribly wrong, SHOULD die
+      if (err) {
+        log.error('failed to insert a push job', err);
+        process.exit(1);
+      }
+
+      if (res.job.id || res.job.status) {
+        log.error('job has build associated with it', {push: query, existing: res});
+        return;
+      }
+
+      res.job.id = job_id;
+      res.job.status = 'new';
+      this.connection.pushes.update(query, { $set: res.job });
+    });
   };
 
   MongoDB.prototype.updateJobStatus = function(job_id, status, result) {
