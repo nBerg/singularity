@@ -46,10 +46,6 @@ var Jenkins = function(config, application, idGen) {
     });
   });
 
-  self.application.on('build.check', function(job_name, callback) {
-    self.checkBuild(job_name, callback);
-  });
-
   self.application.on('process_artifacts', function(job_name, build, pull) {
     self.processArtifacts(job_name, build, pull);
   });
@@ -107,7 +103,7 @@ Jenkins.prototype.start = function() {
           if (!pull) {
             return;
           }
-          self.checkJob(pull);
+          self.checkPRJob(pull);
         });
 
         setTimeout(run_jenkins, self.config.frequency);
@@ -304,65 +300,76 @@ Jenkins.prototype.buildPush = function(push, branch) {
 };
 
 /**
+ * Use this.getJobBuilds to get a build for a project matching a specific job ID.
+ * If nothing can be found, returns false
+ *
+ * @method getBuildById
+ * @param project_name {String}
+ * @param build_id {String}
+ */
+Jenkins.prototype.getBuildById = function(project_name, build_id) {
+  this.getJobBuilds(project_name, function(err, builds) {
+    if (err) {
+      this.application.log.error('Could not connect to jenkins, there seems to be a connectivity issue!');
+      return false;
+    }
+
+    builds.forEach(function(build) {
+      build.parameters.forEach(function(param) {
+        if (param.name === 'JOB' && param.value === build_id) {
+          return build;
+        }
+      });
+    });
+  });
+
+  return false;
+};
+
+/**
  * Uses the Jenkins REST API to check if the provided pull request has any jobs that recently finished. If so
  * their status in the database is updated and events are triggered so other plugins can re-act to the completion
  * of the job.
  *
- * @method checkJob
+ * @method checkPRJob
  * @param pull {Object}
  */
-Jenkins.prototype.checkJob = function(pull) {
+Jenkins.prototype.checkPRJob = function(pull) {
   var noun,
-      self = this,
       job = this.findUnfinishedJob(pull),
       project = this.findProjectByRepo(pull.repo);
 
   if (!job || !project) {
     noun = (!job) ? 'job' : 'project';
-    self.application.log.error('Could not find a ' + noun + ' for ' + pull.repo + ' #' + pull.number + ' on ' + self.config.host);
+    this.application.log.error('No ' + noun + ' for ' + pull.repo + ' on ' + this.config.host);
     return;
   }
 
-  this.checkBuild(project.name, function(error, response) {
-    if (error) {
-      self.application.log.error('Could not connect to jenkins, there seems to be a connectivity issue!');
-      return;
-    }
+  var build = this.getBuildById(project.name, job.id);
 
-    response.body.builds.forEach(function(build) {
-      if (typeof build.actions === 'undefined' || typeof build.actions[0].parameters === 'undefined' || !build.actions[0].parameters) {
-        return;
-      }
+  if (!build) {
+    return;
+  }
 
-      build.actions[0].parameters.forEach(function(param) {
-        if (param.name === 'JOB' && param.value === job.id) {
-          if (job.status === 'new') {
-            self.application.db.updateJobStatus(job.id, 'started', 'BUILDING');
-            self.application.emit('build.started', job, pull, build.url);
-          }
+  if (job.status === 'new') {
+    this.application.db.updateJobStatus(job.id, 'started', 'BUILDING');
+    this.application.emit('build.started', job, pull, build.url);
+  }
 
-          if (job.status !== 'finished' && !build.building) {
-            if (build.result === 'FAILURE') {
-              self.application.db.updateJobStatus(job.id, 'finished', build.result);
-              self.application.emit('build.failed', job, pull, build.url + 'console');
+  if (job.status === 'finished' || build.building) {
+    return;
+  }
 
-              self.processArtifacts(project.name, build, pull);
-            }
-            else if (build.result === 'SUCCESS') {
-              self.application.db.updateJobStatus(job.id, 'finished', build.result);
-              self.application.emit('build.succeeded', job, pull, build.url);
+  var event = 'build.' + build.result.toLowerCase().trim(),
+      debugInfo = { event: event, repo: pull.repo, number: pull.number, job: job};
 
-              self.processArtifacts(project.name, build, pull);
-            }
-            else if (build.result === 'ABORTED') {
-              self.application.db.updateJobStatus(job.id, 'finished', build.result);
-              self.application.emit('build.aborted', job, pull, build.url);
-            }
-          }
-        }
-      });
-    });
-  });
+  this.application.log.debug('PR event', debugInfo);
+  this.application.emit(event, job, pull, build.url);
+  this.application.db.updateJobStatus(job.id, 'finished', build.result);
+
+  if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
+    this.processArtifacts(project.name, build, pull);
+  }
 };
 
 /**
@@ -398,11 +405,11 @@ Jenkins.prototype.triggerBuild = function(job_name, url_options, callback) {
 /**
  * Checks the Jenkins API for the status of a job
  *
- * @method checkBuild
+ * @method getJobBuilds
  * @param job_name {String}
  * @param callback {Function}
  */
-Jenkins.prototype.checkBuild = function(job_name, callback) {
+Jenkins.prototype.getJobBuilds = function(job_name, callback) {
   var self = this,
       options = {
         url: url.format({
@@ -423,6 +430,25 @@ Jenkins.prototype.checkBuild = function(job_name, callback) {
   }
 
   request(options, function(error, response) {
+    if (response.body && response.body.builds) {
+      response = response.body.builds.filter(function(build) {
+        return build.actions && build.actions.some(function(action) {
+          return !!action.parameters;
+        });
+      })
+      .map(function(build) {
+        build.url += 'consoleFull';
+        build.actions.forEach(function(action) {
+          if (action.parameters) {
+            build.parameters = action.parameters;
+          }
+        });
+        return build;
+      });
+    }
+    else {
+      error = 'invalid response - no builds';
+    }
     callback(error, response, self.application);
   });
 };
