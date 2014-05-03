@@ -15,9 +15,10 @@ var request = require('request'),
  * @param application {application} An instance of the main application object
  * @constructor
  */
-var Jenkins = function(config, application, idGen) {
+var Jenkins = function(config, application, idGen, requester) {
   var self = this;
 
+  self. request = requester || request;
   self.uuid = idGen || uuid;
   self.config = config;
   self.application = application;
@@ -52,7 +53,7 @@ var Jenkins = function(config, application, idGen) {
 };
 
 /**
- * Searches a pull requests jobs to find the unfinished one, if one exists.
+ * Finds unfinished jobs for a PR
  *
  * @method findUnfinishedJob
  * @param pull {Object}
@@ -117,7 +118,7 @@ Jenkins.prototype.start = function() {
 };
 
 /**
- * Uses the Jenkins REST API to trigger a new build for the provided pull request.
+ * Uses the Jenkins REST API to trigger a new build for the provided PR
  *
  * @method buildPull
  * @param pull {Object}
@@ -138,7 +139,7 @@ Jenkins.prototype.buildPull = function(pull, number, sha, ssh_url, branch, updat
 
   this.triggerBuild(project.name, {
     token: trigger_token,
-    cause: 'Testing Pull Request: ' + number,
+    cause: 'Testing PR: ' + number,
     REPOSITORY_URL: ssh_url,
     BRANCH_NAME: branch,
     JOB: job_id,
@@ -327,7 +328,7 @@ Jenkins.prototype.getBuildById = function(project_name, build_id) {
 };
 
 /**
- * Uses the Jenkins REST API to check if the provided pull request has any jobs that recently finished. If so
+ * Uses the Jenkins REST API to check if the provided PR has any jobs that recently finished. If so
  * their status in the database is updated and events are triggered so other plugins can re-act to the completion
  * of the job.
  *
@@ -373,7 +374,7 @@ Jenkins.prototype.checkPRJob = function(pull) {
 };
 
 /**
- * Makes a GET request to the Jenkins API to start a build
+ * GET to the Jenkins API to start a build
  *
  * @method triggerBuild
  * @param job_name {String}
@@ -399,7 +400,7 @@ Jenkins.prototype.triggerBuild = function(job_name, url_options, callback) {
 
   this.application.log.debug('jenkins build trigger', options);
 
-  request(options, callback);
+  this.request(options, callback);
 };
 
 /**
@@ -429,7 +430,11 @@ Jenkins.prototype.getJobBuilds = function(job_name, callback) {
     };
   }
 
-  request(options, function(error, response) {
+  self.request(options, function(error, response) {
+    if (error) {
+      self.application.log.error('error when getting job builds', error);
+      return;
+    }
     if (response.body && response.body.builds) {
       response = response.body.builds.filter(function(build) {
         return build.actions && build.actions.some(function(action) {
@@ -449,7 +454,7 @@ Jenkins.prototype.getJobBuilds = function(job_name, callback) {
     else {
       error = 'invalid response - no builds';
     }
-    callback(error, response, self.application);
+    callback(error, response);
   });
 };
 
@@ -482,7 +487,7 @@ Jenkins.prototype.processArtifacts = function(job_name, build, pull) {
   }
 
   var self = this;
-  request(options, function(err, response) {
+  self.request(options, function(err, response) {
     if (err) {
       self.application.log.error(err);
       return;
@@ -517,7 +522,7 @@ Jenkins.prototype.downloadArtifact = function(build, pull, artifact) {
     };
   }
 
-  request(options, function(err, response) {
+  self.request(options, function(err, response) {
     if (err) {
       self.application.log.error(err);
       return;
@@ -530,6 +535,6 @@ Jenkins.prototype.downloadArtifact = function(build, pull, artifact) {
 /**
  * Utility function to load this "plugin" into the application without having to know the object name
  */
-exports.init = function(config, application, idGenerator) {
-  return new Jenkins(config, application, idGenerator);
+exports.init = function(config, application, idGenerator, request) {
+  return new Jenkins(config, application, idGenerator, request);
 };
