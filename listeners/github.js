@@ -36,15 +36,15 @@ var GitHub = function(config, application, events) {
   });
 
   self.application.on('build.started', function(job, pull, build_url) {
-    self.createStatus(job.head, config.user, pull.repo, 'pending', build_url, 'application Build Started');
+    self.createStatus(job.head, config.user, pull.repo, 'pending', build_url, 'Singularity Build Started');
   });
 
   self.application.on('build.failed', function(job, pull, build_url) {
-    self.createStatus(job.head, config.user, pull.repo, 'failure', build_url, 'application Build Failed');
+    self.createStatus(job.head, config.user, pull.repo, 'failure', build_url, 'Singularity Build Failed');
   });
 
   self.application.on('build.succeeded', function(job, pull, build_url) {
-    self.createStatus(job.head, config.user, pull.repo, 'success', build_url, 'application Build Succeeded');
+    self.createStatus(job.head, config.user, pull.repo, 'success', build_url, 'Singularity Build Succeeded');
   });
 
   self.application.on('pull.inline_status', function(pull, sha, file, position, comment) {
