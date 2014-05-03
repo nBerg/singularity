@@ -15,9 +15,10 @@ var request = require('request'),
  * @param application {application} An instance of the main application object
  * @constructor
  */
-var Jenkins = function(config, application) {
+var Jenkins = function(config, application, idGen) {
   var self = this;
 
+  self.uuid = idGen || uuid;
   self.config = config;
   self.application = application;
 
@@ -133,8 +134,8 @@ Jenkins.prototype.start = function() {
  */
 Jenkins.prototype.buildPull = function(pull, number, sha, ssh_url, branch, updated_at) {
   var project = this.findProjectByRepo(pull.repo),
-      job_id = uuid.v1(),
       self = this,
+      job_id = self.uuid.v1(),
       trigger_token = project.token || self.config.token;
 
   this.application.log.info('Starting build for pull', { pull_number: pull.number, project: project.name });
@@ -283,7 +284,7 @@ Jenkins.prototype.pushFound = function(push) {
 Jenkins.prototype.buildPush = function(push, branch) {
   var self = this,
       repo = push.repository.name,
-      job_id = uuid.v1(),
+      job_id = self.uuid.v1(),
       url_opts = {
         token: self.config.push_projects[repo].token || self.config.token,
         cause: push.ref + ' updated to ' + push.after,
@@ -503,6 +504,6 @@ Jenkins.prototype.downloadArtifact = function(build, pull, artifact) {
 /**
  * Utility function to load this "plugin" into the application without having to know the object name
  */
-exports.init = function(config, application) {
-  return new Jenkins(config, application);
+exports.init = function(config, application, idGenerator) {
+  return new Jenkins(config, application, idGenerator);
 };
