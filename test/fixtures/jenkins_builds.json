@@ -1,0 +1,80 @@
+{
+    "body": {
+        "builds": [
+            {
+                "actions": [
+                    {
+                        "parameters": [
+                            {
+                                "name": "REPOSITORY_URL",
+                                "value": "git@github.com:forker/foo.git"
+                            },
+                            {
+                                "name": "BRANCH_NAME",
+                                "value": "awesomesauce"
+                            },
+                            {
+                                "name": "BASE_REPOSITORY_URL",
+                                "value": "git@github.com:acme/foo.git"
+                            },
+                            {
+                                "name": "BASE_BRANCH_NAME",
+                                "value": "awesomsauceAwYe"
+                            },
+                            {
+                                "name": "JOB",
+                                "value": "fpood350-dur7-11e3-barf-foo4d3ff4728"
+                            },
+                            {
+                                "name": "PULL",
+                                "value": "9001"
+                            }
+                        ]
+                    },
+                    {
+                        "causes": [
+                            {
+                                "shortDescription": "Started by remote host pooopy with note: Testing Pull Request: 9001"
+                            }
+                        ]
+                    },
+                    {},
+                    {},
+                    {},
+                    {},
+                    {}
+                ],
+                "building": false,
+                "number": 1053,
+                "result": "SUCCESS",
+                "url": "http://myjenkins.host.com:8080/view/Mergeatron/job/mergeatron-foo/1053/"
+            },
+            {
+                "actions": [
+                    {
+                        "causes": [
+                            {
+                                "shortDescription": "Started by remote host pooopy with note: Testing Pull Request: 9002"
+                            }
+                        ]
+                    },
+                    {},
+                    {},
+                    {},
+                    {},
+                    {}
+                ],
+                "building": true,
+                "number": 1053,
+                "result": "SUCCESS",
+                "url": "http://myjenkins.host.com:8080/view/Mergeatron/job/mergeatron-foo/1054/"
+            },
+            {
+                "building": true,
+                "number": 1055,
+                "result": "SUCCESS",
+                "url": "http://myjenkins.host.com:8080/view/Mergeatron/job/mergeatron-foo/1055/"
+            }
+        ]
+    }
+}

@@ -1,5 +1,6 @@
 var sinon = require('sinon'),
     assert = require('assert'),
+    expect = require('chai').expect,
     Emitter = require('events').EventEmitter,
     Jenkins = require('../../listeners/jenkins');
 
@@ -11,6 +12,8 @@ describe('Jenkins', function() {
     test.app = new Emitter();
     test.generator = {v1: function() { return 'test-id'; }};
     test.config = {
+      protocol: 'http',
+      host: 'myjenkins.host.com',
       token: 'global_test_token',
       push_projects: {
         test_repo: {
@@ -47,6 +50,21 @@ describe('Jenkins', function() {
       test.jenkins.buildPush(test.mockPush, 'test_branch');
 
       assert(triggerSpy.withArgs('test_project', expected_opts).calledOnce);
+    });
+  });
+
+  describe('getJobBuilds', function() {
+    it('formats & filters responses correctly', function() {
+      var jenkinsBuilds = require('../fixtures/jenkins_builds.json'),
+          requestStub = function(opt, cb) {
+            cb(null, jenkinsBuilds);
+          };
+      test.jenkins = Jenkins.init(test.config, test.app, test.generator, requestStub);
+      test.jenkins.getJobBuilds('should_not_matter', function(err, builds) {
+        expect(builds.length).to.be.equal(1);
+        expect(builds[0].parameters).to.be.an('Array');
+        expect(builds[0].url).to.contain('consoleFull');
+      });
     });
   });
 });
