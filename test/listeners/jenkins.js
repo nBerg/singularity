@@ -1,11 +1,15 @@
 var sinon = require('sinon'),
     assert = require('assert'),
-    expect = require('chai').expect,
+    chai = require('chai'),
+    expect = chai.expect,
     Emitter = require('events').EventEmitter,
     Jenkins = require('../../listeners/jenkins');
 
+chai.use(require('sinon-chai'));
+
 describe('Jenkins', function() {
   var test = this;
+  test.mongoPush = require('../fixtures/mongo_push');
 
   beforeEach(function(done) {
     test.events = new Emitter();
@@ -65,6 +69,47 @@ describe('Jenkins', function() {
         expect(builds[0].parameters).to.be.an('Array');
         expect(builds[0].url).to.contain('consoleFull');
       });
+    });
+  });
+
+  describe('checkPushJob', function() {
+    it('returns when no build for push', function() {
+      var getBuildSpy = sinon.spy();
+
+      sinon.stub(test.jenkins, 'getBuildById', getBuildSpy);
+
+      expect(test.jenkins.checkPushJob(test.mongoPush)).to.be.undefined;
+    });
+
+    it('reacts to progressing build correctly', function() {
+      var getBuildStub = sinon.stub(test.jenkins, 'getBuildById'),
+          dbSpy = sinon.spy();
+
+      test.jenkins.application.db = { updateJobStatus: function() {} };
+      sinon.stub(test.jenkins.application.db, 'updateJobStatus', dbSpy);
+      getBuildStub.returns({ building: true });
+
+      expect(test.jenkins.checkPushJob(test.mongoPush)).to.be.undefined;
+      expect(dbSpy).to.have.been.calledOnce;
+    });
+
+    it('updates finished build statuses', function() {
+      var getBuildStub = sinon.stub(test.jenkins, 'getBuildById'),
+          dbSpy = sinon.spy(),
+          logSpy = sinon.spy(),
+          artifactSpy = sinon.spy();
+
+      test.jenkins.application.db = { updateJobStatus: function() {} };
+      test.jenkins.application.log = { debug: function() {} };
+      sinon.stub(test.jenkins.application.db, 'updateJobStatus', dbSpy);
+      sinon.stub(test.jenkins.application.log, 'debug', logSpy);
+      sinon.stub(test.jenkins, 'processArtifacts', artifactSpy);
+      getBuildStub.returns({ building: false, result: "FAILURE" });
+
+      expect(test.jenkins.checkPushJob(test.mongoPush)).to.be.undefined;
+      expect(dbSpy).to.have.been.calledOnce;
+      expect(logSpy).to.have.been.calledOnce;
+      expect(artifactSpy).to.have.been.calledOnce;
     });
   });
 });
