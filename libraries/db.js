@@ -9,8 +9,8 @@ exports.init = function(config, log) {
     return null;
   }
 
-  // mongo abstraction layer
   var MongoDB = function() {
+    this.config = config;
     this.connection = require('mongojs').connect(config.auth, config.collections);
     this.connection.pulls.ensureIndex({number: 1, repo_id: 1 }, { unique: true, sparse: true }, function(err, res) {
       if (err) {
@@ -31,7 +31,6 @@ exports.init = function(config, log) {
     }, callback);
   };
 
-  // push methods
   MongoDB.prototype.findPush = function(repo, ref, head, callback) {
     this.connection.pushes.findOne({ repo: repo, ref: ref, sha: head }, callback);
   };
@@ -41,14 +40,10 @@ exports.init = function(config, log) {
       repo: push.repository.name,
       ref: push.ref,
       sha: push.after,
-      job: {
-        id: null,
-        status: null
-      }
+      jobs: []
     }, callback);
   };
 
-  // pull methods
   MongoDB.prototype.findPull = function(pull_number, pull_repo, callback) {
     this.connection.pulls.findOne({ number: pull_number, repo: pull_repo }, callback);
   };
@@ -85,11 +80,14 @@ exports.init = function(config, log) {
     this.connection.pulls.find({ repo_id: repo, status: { $in: statuses } }).limit(limit, callback);
   };
 
-  MongoDB.prototype.findPullsByJobStatus = function(statuses, callback) {
-    this.connection.pulls.find({ 'jobs.status': { $in: statuses }}).forEach(callback);
+  MongoDB.prototype.findByJobStatus = function(collection, statuses, callback) {
+    if (this.config.collections.indexOf(collection) === -1) {
+      log.error('unknown collection', collection);
+      return;
+    }
+    this.connection[collection].find({ 'jobs.status': { $in: statuses }}).forEach(callback);
   };
 
-  // job methods
   MongoDB.prototype.insertJob = function(pull, job) {
     if (typeof pull.jobs === 'undefined') {
       pull.jobs = [];
@@ -113,22 +111,25 @@ exports.init = function(config, log) {
         process.exit(1);
       }
 
-      if (res.job.id || res.job.status) {
-        log.error('job has build associated with it', {push: query, existing: res});
+      if (res.jobs.length > 0) {
+        log.error('job has a build associated with it', {push: query, existing: res});
         return;
       }
 
-      res.job.id = job_id;
-      res.job.status = 'new';
-      this.connection.pushes.update(query, { $set: res.job });
+      res.jobs.push({ id: job_id, status: 'new', result: null });
+      this.connection.pushes.update(query, { $set: res });
     }.bind(this));
   };
 
-  MongoDB.prototype.updateJobStatus = function(job_id, status, result) {
-    this.connection.pulls.update({ 'jobs.id': job_id }, { $set: { 'jobs.$.status': status, 'jobs.$.result': result }});
+  MongoDB.prototype.updateJobStatus = function(collection, job_id, status, result) {
+    if (this.config.collections.indexOf(collection) === -1) {
+      log.error('unknown collection', collection);
+      return;
+    }
+
+    this.connection[collection].update({ 'jobs.id': job_id }, { $set: { 'jobs.$.status': status, 'jobs.$.result': result }});
   };
 
-  // inline status methods
   MongoDB.prototype.insertLineStatus = function(pull, filename, line_number) {
     this.connection.pulls.update({ _id: pull.number, 'files.filename': filename }, { $push: { 'files.$.reported': line_number } });
   };
