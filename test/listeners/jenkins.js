@@ -112,4 +112,34 @@ describe('Jenkins', function() {
       expect(artifactSpy).to.have.been.calledOnce;
     });
   });
+
+  describe('getBuildById', function() {
+    it('returns false on connection issue', function() {
+      var jobBuildsStub = sinon.stub(test.jenkins, 'getJobBuilds'),
+          logSpy = sinon.spy();
+
+      test.jenkins.application.log = { error: function() {} };
+      sinon.stub(test.jenkins.application.log, 'error', logSpy);
+      jobBuildsStub.callsArgWith(1, 'test-error', null);
+
+      test.jenkins.getBuildById('some-project', 'id-dont-matter');
+    });
+
+    it('returns a build', function() {
+      var jobBuildsStub = sinon.stub(test.jenkins, 'getJobBuilds');
+
+      jobBuildsStub.callsArgWith(1, null, [require('../fixtures/jenkins_builds.json').body.builds[0]]);
+
+      expect(test.jenkins.getBuildById('project-dont-matter', 'fpood350-dur7-11e3-barf-foo4d3ff4728').parameters)
+      .to.contain({name: 'JOB', value: 'fpood350-dur7-11e3-barf-foo4d3ff4728'});
+    });
+
+    it('returns false when no build', function() {
+      var jobBuildsStub = sinon.stub(test.jenkins, 'getJobBuilds');
+
+      jobBuildsStub.callsArgWith(1, null, [require('../fixtures/jenkins_builds.json').body.builds[0]]);
+
+      expect(test.jenkins.getBuildById('project-dont-matter', 'blah')).to.be.false;
+    });
+  });
 });

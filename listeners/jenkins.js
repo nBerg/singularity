@@ -319,22 +319,25 @@ Jenkins.prototype.buildPush = function(push, branch) {
  * @param build_id {String}
  */
 Jenkins.prototype.getBuildById = function(project_name, build_id) {
+  var self = this,
+      found = false;
+
   this.getJobBuilds(project_name, function(err, builds) {
     if (err) {
-      this.application.log.error('Could not connect to jenkins, there seems to be a connectivity issue!');
+      self.application.log.error('Could not connect to jenkins, there seems to be a connectivity issue!');
       return false;
     }
 
     builds.forEach(function(build) {
       build.parameters.forEach(function(param) {
         if (param.name === 'JOB' && param.value === build_id) {
-          return build;
+          found = build;
         }
       });
     });
   });
 
-  return false;
+  return found;
 };
 
 /**
