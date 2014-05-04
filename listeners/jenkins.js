@@ -95,16 +95,26 @@ Jenkins.prototype.start = function() {
   async.parallel({
     jenkins: function() {
       var run_jenkins = function() {
-        self.application.db.findPullsByJobStatus(['new', 'started'], function(err, pull) {
+        self.application.db.findByJobStatus('pulls', ['new', 'started'], function(err, pull) {
           if (err) {
             self.application.log.error(err);
             process.exit(1);
           }
-
           if (!pull) {
             return;
           }
           self.checkPRJob(pull);
+        });
+
+        self.application.db.findByJobStatus('pushes', ['new', 'started'], function(err, push) {
+          if (err) {
+            self.application.log.error(err);
+            process.exit(1);
+          }
+          if (!push) {
+            return;
+          }
+          self.checkPushJob(push);
         });
 
         setTimeout(run_jenkins, self.config.frequency);
@@ -353,7 +363,7 @@ Jenkins.prototype.checkPRJob = function(pull) {
   }
 
   if (job.status === 'new') {
-    this.application.db.updateJobStatus(job.id, 'started', 'BUILDING');
+    this.application.db.updateJobStatus('pulls', job.id, 'started', 'BUILDING');
     this.application.emit('build.started', job, pull, build.url);
   }
 
@@ -366,10 +376,38 @@ Jenkins.prototype.checkPRJob = function(pull) {
 
   this.application.log.debug('PR event', debugInfo);
   this.application.emit(event, job, pull, build.url);
-  this.application.db.updateJobStatus(job.id, 'finished', build.result);
+  this.application.db.updateJobStatus('pulls', job.id, 'finished', build.result);
 
   if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
     this.processArtifacts(project.name, build, pull);
+  }
+};
+
+/**
+ * Similar to checkPRJob() but for pushes
+ *
+ * @method checkPushJob
+ * @param push {Object}
+ */
+Jenkins.prototype.checkPushJob = function(push) {
+  var job = push.jobs[0],
+      project = this.config.push_projects[push.repo],
+      build = this.getBuildById(project.name, job.id);
+
+  if (!build) {
+    return;
+  }
+
+  if (build.building) {
+    this.application.db.updateJobStatus('pushes', job.id, 'started', 'BUILDING');
+    return;
+  }
+
+  this.application.log.debug('Push updated', { project: project, push: push, job: job});
+  this.application.db.updateJobStatus('pushes', job.id, 'finished', build.result);
+
+  if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
+    this.processArtifacts(project.name, build, push);
   }
 };
 
