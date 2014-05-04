@@ -359,6 +359,7 @@ Jenkins.prototype.checkPRJob = function(pull) {
   var build = this.getBuildById(project.name, job.id);
 
   if (!build) {
+    this.application.log.error('no build found for PR', { repo: pull.repo, number: pull.number });
     return;
   }
 
