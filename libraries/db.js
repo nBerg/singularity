@@ -106,7 +106,7 @@ exports.init = function(config, log) {
       repo: push.repository.name,
       sha: push.after
     };
-    this.findPush(query, function(err, res) {
+    this.findPush(push.repository.name, push.ref, push.after, function(err, res) {
       // something went terribly wrong, SHOULD die
       if (err) {
         log.error('failed to insert a push job', err);
@@ -121,7 +121,7 @@ exports.init = function(config, log) {
       res.job.id = job_id;
       res.job.status = 'new';
       this.connection.pushes.update(query, { $set: res.job });
-    });
+    }.bind(this));
   };
 
   MongoDB.prototype.updateJobStatus = function(job_id, status, result) {
