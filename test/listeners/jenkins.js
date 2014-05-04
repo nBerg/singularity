@@ -115,14 +115,21 @@ describe('Jenkins', function() {
 
   describe('getBuildById', function() {
     it('returns false on connection issue', function() {
-      var jobBuildsStub = sinon.stub(test.jenkins, 'getJobBuilds'),
-          logSpy = sinon.spy();
+      var jobBuildsStub = sinon.stub(test.jenkins, 'getJobBuilds');
 
-      test.jenkins.application.log = { error: function() {} };
-      sinon.stub(test.jenkins.application.log, 'error', logSpy);
-      jobBuildsStub.callsArgWith(1, 'test-error', null);
+      jobBuildsStub.callsArgWith(1, 'test-error', 'wat');
 
-      test.jenkins.getBuildById('some-project', 'id-dont-matter');
+      test.jenkins.getBuildById('some-project', 'id-dont-matter', function(err, res) {
+        expect(err).to.be.null;
+        expect(res).to.be.false;
+      });
+
+      jobBuildsStub.callsArgWith(1, null, null);
+
+      test.jenkins.getBuildById('some-project', 'id-dont-matter', function(err, res) {
+        expect(err).to.be.null;
+        expect(res).to.be.false;
+      });
     });
 
     it('returns a build', function() {
@@ -130,16 +137,12 @@ describe('Jenkins', function() {
 
       jobBuildsStub.callsArgWith(1, null, [require('../fixtures/jenkins_builds.json').body.builds[0]]);
 
-      expect(test.jenkins.getBuildById('project-dont-matter', 'fpood350-dur7-11e3-barf-foo4d3ff4728').parameters)
-      .to.contain({name: 'JOB', value: 'fpood350-dur7-11e3-barf-foo4d3ff4728'});
-    });
-
-    it('returns false when no build', function() {
-      var jobBuildsStub = sinon.stub(test.jenkins, 'getJobBuilds');
-
-      jobBuildsStub.callsArgWith(1, null, [require('../fixtures/jenkins_builds.json').body.builds[0]]);
-
-      expect(test.jenkins.getBuildById('project-dont-matter', 'blah')).to.be.false;
+      test.jenkins.getBuildById('project-dont-matter',
+      'fpood350-dur7-11e3-barf-foo4d3ff4728',
+      function(err, build) {
+        expect(err).to.be.null;
+        expect(build.parameters).to.contain({name: 'JOB', value: 'fpood350-dur7-11e3-barf-foo4d3ff4728'});
+      });
     });
   });
 });

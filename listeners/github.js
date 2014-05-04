@@ -39,12 +39,16 @@ var GitHub = function(config, application, events) {
     self.createStatus(job.head, config.user, pull.repo, 'pending', build_url, 'Singularity Build Started');
   });
 
-  self.application.on('build.failed', function(job, pull, build_url) {
+  self.application.on('build.failure', function(job, pull, build_url) {
     self.createStatus(job.head, config.user, pull.repo, 'failure', build_url, 'Singularity Build Failed');
   });
 
-  self.application.on('build.succeeded', function(job, pull, build_url) {
+  self.application.on('build.success', function(job, pull, build_url) {
     self.createStatus(job.head, config.user, pull.repo, 'success', build_url, 'Singularity Build Succeeded');
+  });
+
+  self.application.on('build.aborted', function(job, pull, build_url) {
+    self.createStatus(job.head, config.user, pull.repo, 'aborted', build_url, 'Singularity Build Aborted');
   });
 
   self.application.on('pull.inline_status', function(pull, sha, file, position, comment) {

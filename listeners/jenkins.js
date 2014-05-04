@@ -318,26 +318,21 @@ Jenkins.prototype.buildPush = function(push, branch) {
  * @param project_name {String}
  * @param build_id {String}
  */
-Jenkins.prototype.getBuildById = function(project_name, build_id) {
-  var self = this,
-      found = false;
-
+Jenkins.prototype.getBuildById = function(project_name, build_id, callback) {
   this.getJobBuilds(project_name, function(err, builds) {
-    if (err) {
-      self.application.log.error('Could not connect to jenkins, there seems to be a connectivity issue!');
-      return false;
+    if (err || !builds) {
+      callback(null, false);
+      return;
     }
 
     builds.forEach(function(build) {
       build.parameters.forEach(function(param) {
         if (param.name === 'JOB' && param.value === build_id) {
-          found = build;
+          callback(null, build);
         }
       });
     });
   });
-
-  return found;
 };
 
 /**
@@ -350,41 +345,41 @@ Jenkins.prototype.getBuildById = function(project_name, build_id) {
  */
 Jenkins.prototype.checkPRJob = function(pull) {
   var noun,
-      job = this.findUnfinishedJob(pull),
-      project = this.findProjectByRepo(pull.repo);
+      self = this,
+      job = self.findUnfinishedJob(pull),
+      project = self.findProjectByRepo(pull.repo);
 
   if (!job || !project) {
     noun = (!job) ? 'job' : 'project';
-    this.application.log.error('No ' + noun + ' for ' + pull.repo + ' on ' + this.config.host);
+    self.application.log.error('No ' + noun + ' for ' + pull.repo + ' on ' + self.config.host);
     return;
   }
 
-  var build = this.getBuildById(project.name, job.id);
+  self.getBuildById(project.name, job.id, function(err, build) {
+    if (!build) {
+      return;
+    }
 
-  if (!build) {
-    this.application.log.error('no build found for PR', { repo: pull.repo, number: pull.number });
-    return;
-  }
+    if (job.status === 'new') {
+      self.application.db.updateJobStatus('pulls', job.id, 'started', 'BUILDING');
+      self.application.emit('build.started', job, pull, build.url);
+    }
 
-  if (job.status === 'new') {
-    this.application.db.updateJobStatus('pulls', job.id, 'started', 'BUILDING');
-    this.application.emit('build.started', job, pull, build.url);
-  }
+    if (job.status === 'finished' || build.building) {
+      return;
+    }
 
-  if (job.status === 'finished' || build.building) {
-    return;
-  }
+    var event = 'build.' + build.result.toLowerCase().trim(),
+        debugInfo = { event: event, repo: pull.repo, number: pull.number, job: job};
 
-  var event = 'build.' + build.result.toLowerCase().trim(),
-      debugInfo = { event: event, repo: pull.repo, number: pull.number, job: job};
+    self.application.log.debug('PR event', debugInfo);
+    self.application.emit(event, job, pull, build.url);
+    self.application.db.updateJobStatus('pulls', job.id, 'finished', build.result);
 
-  this.application.log.debug('PR event', debugInfo);
-  this.application.emit(event, job, pull, build.url);
-  this.application.db.updateJobStatus('pulls', job.id, 'finished', build.result);
-
-  if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
-    this.processArtifacts(project.name, build, pull);
-  }
+    if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
+      self.processArtifacts(project.name, build, pull);
+    }
+  });
 };
 
 /**
