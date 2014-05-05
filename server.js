@@ -15,7 +15,7 @@ app.post('/', function(request, response) {
 });
 
 app.use('/pull_requests', require('./routes/pull_requests').init(app));
-app.use('/merge', require('./routes/pull_requests').init(app));
+app.use('/merge', require('./routes/merge').init(app));
 app.use('/config', require('./routes/cfg').init(app));
 
 var server = app.listen(config.port || 80, function() {
