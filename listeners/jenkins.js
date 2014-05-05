@@ -15,58 +15,56 @@ var request = require('request'),
  * @param application {application} An instance of the main application object
  * @constructor
  */
-var Jenkins = function(config, application) {
-    var self = this;
+var Jenkins = function(config, application, idGen, requester) {
+  var self = this;
 
-    self.config = config;
-    self.application = application;
+  self. request = requester || request;
+  self.uuid = idGen || uuid;
+  self.config = config;
+  self.application = application;
 
-    self.application.on('push.found', function(push) {
-        self.pushFound(push);
+  self.application.on('push.found', function(push) {
+    self.pushFound(push);
+  });
+
+  self.application.on('pull.processed', function(pull, pull_number, sha, ssh_url, branch, updated_at) {
+    self.buildPull(pull, pull_number, sha, ssh_url, branch, updated_at);
+  });
+
+  self.application.on('pull.found', function(pull) {
+    self.pullFound(pull);
+  });
+
+  self.application.on('build.download_artifact', function(build, pull, artifact) {
+    self.downloadArtifact(build, pull, artifact);
+  });
+
+  self.application.on('build.trigger', function(job_name, url_options) {
+    self.triggerBuild(job_name, url_options, function(error) {
+      if (error) {
+        self.application.log.info('Received error from Jenkins when triggering build', { job_name: job_name, url_options: url_options });
+      }
     });
+  });
 
-    self.application.on('pull.processed', function(pull, pull_number, sha, ssh_url, branch, updated_at) {
-        self.buildPull(pull, pull_number, sha, ssh_url, branch, updated_at);
-    });
-
-    self.application.on('pull.found', function(pull) {
-        self.pullFound(pull);
-    });
-
-    self.application.on('build.download_artifact', function(build, pull, artifact) {
-        self.downloadArtifact(build, pull, artifact);
-    });
-
-    self.application.on('build.trigger', function(job_name, url_options) {
-        self.triggerBuild(job_name, url_options, function(error) {
-            if (error) {
-                self.application.log.info('Received error from Jenkins when triggering build', { job_name: job_name, url_options: url_options });
-            }
-        });
-    });
-
-    self.application.on('build.check', function(job_name, callback) {
-        self.checkBuild(job_name, callback);
-    });
-
-    self.application.on('process_artifacts', function(job_name, build, pull) {
-        self.processArtifacts(job_name, build, pull);
-    });
+  self.application.on('process_artifacts', function(job_name, build, pull) {
+    self.processArtifacts(job_name, build, pull);
+  });
 };
 
 /**
- * Searches a pull requests jobs to find the unfinished one, if one exists.
+ * Finds unfinished jobs for a PR
  *
  * @method findUnfinishedJob
  * @param pull {Object}
  * @returns {Object}
  */
 Jenkins.prototype.findUnfinishedJob = function(pull) {
-    for (var x in pull.jobs) {
-        if (pull.jobs[x].status !== 'finished') {
-            return pull.jobs[x];
-        }
+  for (var x in pull.jobs) {
+    if (pull.jobs[x].status !== 'finished') {
+      return pull.jobs[x];
     }
+  }
 };
 
 /**
@@ -77,14 +75,14 @@ Jenkins.prototype.findUnfinishedJob = function(pull) {
  * @returns {Object}
  */
 Jenkins.prototype.findProjectByRepo = function(repo) {
-    var found = null;
-    this.config.projects.forEach(function(project) {
-        if (repo === project.repo) {
-            found = project;
-        }
-    });
+  var found = null;
+  this.config.projects.forEach(function(project) {
+    if (repo === project.repo) {
+      found = project;
+    }
+  });
 
-    return found;
+  return found;
 };
 
 /**
@@ -97,16 +95,26 @@ Jenkins.prototype.start = function() {
   async.parallel({
     jenkins: function() {
       var run_jenkins = function() {
-        self.application.db.findPullsByJobStatus(['new', 'started'], function(err, pull) {
+        self.application.db.findByJobStatus(['new', 'started'], function(err, pull) {
           if (err) {
             self.application.log.error(err);
             process.exit(1);
           }
-
           if (!pull) {
             return;
           }
-          self.checkJob(pull);
+          self.checkPRJob(pull);
+        });
+
+        self.application.db.findPushJobsByStatus(['new', 'started'], function(err, push) {
+          if (err) {
+            self.application.log.error(err);
+            process.exit(1);
+          }
+          if (!push) {
+            return;
+          }
+          self.checkPushJob(push);
         });
 
         setTimeout(run_jenkins, self.config.frequency);
@@ -120,7 +128,7 @@ Jenkins.prototype.start = function() {
 };
 
 /**
- * Uses the Jenkins REST API to trigger a new build for the provided pull request.
+ * Uses the Jenkins REST API to trigger a new build for the provided PR
  *
  * @method buildPull
  * @param pull {Object}
@@ -132,35 +140,36 @@ Jenkins.prototype.start = function() {
  * @todo Do we need to pass all these parameters, is just passing pull enough?
  */
 Jenkins.prototype.buildPull = function(pull, number, sha, ssh_url, branch, updated_at) {
-    var project = this.findProjectByRepo(pull.repo),
-        job_id = uuid.v1(),
-        self = this,
-        trigger_token = project.token || self.config.token;
+  var project = this.findProjectByRepo(pull.repo),
+      self = this,
+      job_id = self.uuid.v1(),
+      trigger_token = project.token || self.config.token;
 
-    this.application.log.info('Starting build for pull', { pull_number: pull.number, project: project.name });
+  this.application.log.info('Starting build for pull', { pull_number: pull.number, project: project.name });
 
-    this.triggerBuild(project.name, {
-        token: trigger_token,
-        cause: 'Testing Pull Request: ' + number,
-        REPOSITORY_URL: ssh_url,
-        BRANCH_NAME: branch,
-        JOB: job_id,
-        PULL: number,
-        BASE_BRANCH_NAME: pull.base.ref,
-        SHA: sha
-    }, function(error) {
-        if (error) {
-            self.application.log.error(error);
-            return;
-        }
+  this.triggerBuild(project.name, {
+    token: trigger_token,
+    cause: 'Testing PR: ' + number,
+    REPOSITORY_URL: ssh_url,
+    BRANCH_NAME: branch,
+    JOB: job_id,
+    PULL: number,
+    BASE_BRANCH_NAME: pull.base.ref,
+    SHA: sha
+  },
+  function(error) {
+    if (error) {
+      self.application.log.error(error);
+      return;
+    }
 
-        self.application.db.updatePull(number, pull.repo, { head: sha, updated_at: updated_at});
-        self.application.db.insertJob(pull, {
-            id: job_id,
-            status: 'new',
-            head: sha
-        });
+    self.application.db.updatePull(number, pull.repo, { head: sha, updated_at: updated_at});
+    self.application.db.insertJob(pull, {
+      id: job_id,
+      status: 'new',
+      head: sha
     });
+  });
 };
 
 /**
@@ -172,34 +181,34 @@ Jenkins.prototype.buildPull = function(pull, number, sha, ssh_url, branch, updat
  * @param pull {Object}
  */
 Jenkins.prototype.pullFound = function(pull) {
-    var project = this.findProjectByRepo(pull.repo);
+  var project = this.findProjectByRepo(pull.repo);
 
-    if (!project) {
-        this.application.log.error('No jenkins job found for PR', { pull: pull.number, repository: pull.base.repo.fullname || pull.base.repo.name });
-        return;
+  if (!project) {
+    this.application.log.error('No jenkins job found for PR', { pull: pull.number, repository: pull.base.repo.fullname || pull.base.repo.name });
+    return;
+  }
+
+  if (!project.rules) {
+    this.application.log.debug('Validating pull with no rules', { pull: pull.number, project: project.name });
+    this.application.emit('pull.validated', pull);
+    return;
+  }
+
+  for (var x in pull.files) {
+    if (!pull.files[x].filename || typeof pull.files[x].filename !== 'string') {
+      continue;
     }
 
-    if (!project.rules) {
-        this.application.log.debug('Validating pull with no rules', { pull: pull.number, project: project.name });
+    for (var y in project.rules) {
+      if (pull.files[x].filename.match(project.rules[y])) {
+        this.application.log.debug('Validating pull with rules', { pull: pull.number, project: project.name });
         this.application.emit('pull.validated', pull);
         return;
+      }
     }
+  }
 
-    for (var x in pull.files) {
-        if (!pull.files[x].filename || typeof pull.files[x].filename !== 'string') {
-            continue;
-        }
-
-        for (var y in project.rules) {
-            if (pull.files[x].filename.match(project.rules[y])) {
-                this.application.log.debug('Validating pull with rules', { pull: pull.number, project: project.name });
-                this.application.emit('pull.validated', pull);
-                return;
-            }
-        }
-    }
-
-    this.application.log.debug('Invalidating pull with rules', { pull: pull.number, project: project.name });
+  this.application.log.debug('Invalidating pull with rules', { pull: pull.number, project: project.name });
 };
 
 /**
@@ -208,25 +217,25 @@ Jenkins.prototype.pullFound = function(pull) {
  * @param push {Object}
  */
 Jenkins.prototype.validatePush = function(push) {
-    var repo = push.repository.name,
-        log_info = { repo: repo, reference: push.ref, head: push.after };
+  var repo = push.repository.name,
+      log_info = { repo: repo, reference: push.ref, head: push.after };
 
-    if (!this.config.push_projects) {
-        this.application.log.debug('No push_projects config for jenkins plugin', log_info);
-        return false;
-    }
+  if (!this.config.push_projects) {
+    this.application.log.debug('No push_projects config for jenkins plugin', log_info);
+    return false;
+  }
 
-    if (!(repo in this.config.push_projects)) {
-        this.application.log.debug('repo not configured for push events', log_info);
-        return false;
-    }
+  if (!(repo in this.config.push_projects)) {
+    this.application.log.debug('repo not configured for push events', log_info);
+    return false;
+  }
 
-    if (!this.config.push_projects[repo].name) {
-        this.application.log.error('No jenkins project given for repo', log_info);
-        return false;
-    }
+  if (!this.config.push_projects[repo].name) {
+    this.application.log.error('No jenkins project given for repo', log_info);
+    return false;
+  }
 
-    return true;
+  return true;
 };
 
 /**
@@ -237,39 +246,39 @@ Jenkins.prototype.validatePush = function(push) {
  * @param push {Object}
  */
 Jenkins.prototype.pushFound = function(push) {
-    if (!this.validatePush(push)) {
-        return;
+  if (!this.validatePush(push)) {
+    return;
+  }
+
+  var self = this,
+      repo = push.repository.name,
+      project_config = self.config.push_projects[repo],
+      log_info = { repo: repo, reference: push.ref, head: push.after },
+      branch = push.ref.split('/').pop();
+
+  if (!branch) {
+    self.application.log.error('Bad ref name', { ref: push.ref, parsed: branch });
+    return;
+  }
+
+  if (!project_config.rules || !(project_config.rules instanceof Array)) {
+    self.application.log.info('no ref regex rules for push', log_info);
+    self.buildPush(push, branch);
+    return;
+  }
+
+  project_config.rules.some(function(regex) {
+    if (!branch.match(regex)) {
+      self.application.log.debug(branch + ' did not match ' + regex);
+      return false;
     }
 
-    var self = this,
-        repo = push.repository.name,
-        project_config = self.config.push_projects[repo],
-        log_info = { repo: repo, reference: push.ref, head: push.after },
-        branch = push.ref.split('/').pop();
+    log_info.jenkins_trigger = { project: project_config.name, branch: branch };
+    self.application.log.info('regex rule matched for push', log_info);
+    self.buildPush(push, branch);
 
-    if (!branch) {
-        self.application.log.error('Bad ref name', { ref: push.ref, parsed: branch });
-        return;
-    }
-
-    if (!project_config.rules || !(project_config.rules instanceof Array)) {
-        self.application.log.info('no ref regex rules for push', log_info);
-        self.buildPush(push, branch);
-        return;
-    }
-
-    project_config.rules.some(function(regex) {
-        if (!branch.match(regex)) {
-            self.application.log.debug(branch + ' did not match ' + regex);
-            return false;
-        }
-
-        log_info.jenkins_trigger = { project: project_config.name, branch: branch };
-        self.application.log.info('regex rule matched for push', log_info);
-        self.buildPush(push, branch);
-
-        return true;
-    });
+    return true;
+  });
 };
 
 /**
@@ -280,87 +289,134 @@ Jenkins.prototype.pushFound = function(push) {
  * @param branch {String}
  */
 Jenkins.prototype.buildPush = function(push, branch) {
-    var self = this,
-        repo = push.repository.name,
-        url_opts = {
-            token: self.config.push_projects[repo].token || self.config.token,
-            cause: push.ref + ' updated to ' + push.after,
-            BRANCH_NAME: branch,
-            BEFORE: push.before,
-            AFTER: push.after,
-        };
+  var self = this,
+      repo = push.repository.name,
+      job_id = self.uuid.v1(),
+      url_opts = {
+        token: self.config.push_projects[repo].token || self.config.token,
+        cause: push.ref + ' updated to ' + push.after,
+        BRANCH_NAME: branch,
+        BEFORE: push.before,
+        AFTER: push.after,
+        JOB: job_id
+      };
 
-    self.triggerBuild(self.config.push_projects[repo].name, url_opts, function(error) {
-        if (error) {
-             self.application.log.error(error);
-        }
-    });
+  self.triggerBuild(self.config.push_projects[repo].name, url_opts, function(error) {
+    if (error) {
+      self.application.log.error(error);
+    }
+
+    self.application.db.insertPushJob(push, job_id);
+  });
 };
 
 /**
- * Uses the Jenkins REST API to check if the provided pull request has any jobs that recently finished. If so
+ * Use this.getJobBuilds to get a build for a project matching a specific job ID.
+ * If nothing can be found, returns false
+ *
+ * @method getBuildById
+ * @param project_name {String}
+ * @param build_id {String}
+ */
+Jenkins.prototype.getBuildById = function(project_name, build_id, callback) {
+  this.getJobBuilds(project_name, function(err, builds) {
+    if (err || !builds) {
+      callback(null, false);
+      return;
+    }
+
+    builds.forEach(function(build) {
+      build.parameters.forEach(function(param) {
+        if (param.name === 'JOB' && param.value === build_id) {
+          callback(null, build);
+        }
+      });
+    });
+  });
+};
+
+/**
+ * Uses the Jenkins REST API to check if the provided PR has any jobs that recently finished. If so
  * their status in the database is updated and events are triggered so other plugins can re-act to the completion
  * of the job.
  *
- * @method checkJob
+ * @method checkPRJob
  * @param pull {Object}
  */
-Jenkins.prototype.checkJob = function(pull) {
-    var noun,
-        self = this,
-        job = this.findUnfinishedJob(pull),
-        project = this.findProjectByRepo(pull.repo);
+Jenkins.prototype.checkPRJob = function(pull) {
+  var noun,
+      self = this,
+      job = self.findUnfinishedJob(pull),
+      project = self.findProjectByRepo(pull.repo);
 
-       if (!job || !project) {
-           noun = (!job) ? 'job' : 'project';
-           self.application.log.error('Could not find a ' + noun + ' for ' + pull.repo + ' #' + pull.number + ' on ' + self.config.host);
-           return;
-       }
+  if (!job || !project) {
+    noun = (!job) ? 'job' : 'project';
+    self.application.log.error('No ' + noun + ' for ' + pull.repo + ' on ' + self.config.host);
+    return;
+  }
 
-    this.checkBuild(project.name, function(error, response) {
-        if (error) {
-            self.application.log.error('Could not connect to jenkins, there seems to be a connectivity issue!');
-            return;
-        }
+  self.getBuildById(project.name, job.id, function(err, build) {
+    if (!build) {
+      return;
+    }
 
-        response.body.builds.forEach(function(build) {
-            if (typeof build.actions === 'undefined' || typeof build.actions[0].parameters === 'undefined' || !build.actions[0].parameters) {
-                return;
-            }
+    if (job.status === 'new') {
+      self.application.db.updatePRJobStatus(job.id, 'started', 'BUILDING');
+      self.application.emit('build.started', job, pull, build.url);
+    }
 
-            build.actions[0].parameters.forEach(function(param) {
-                if (param.name === 'JOB' && param.value === job.id) {
-                    if (job.status === 'new') {
-                        self.application.db.updateJobStatus(job.id, 'started', 'BUILDING');
-                        self.application.emit('build.started', job, pull, build.url);
-                    }
+    if (job.status === 'finished' || build.building) {
+      return;
+    }
 
-                    if (job.status !== 'finished' && !build.building) {
-                        if (build.result === 'FAILURE') {
-                            self.application.db.updateJobStatus(job.id, 'finished', build.result);
-                            self.application.emit('build.failed', job, pull, build.url + 'console');
+    var event = 'build.' + build.result.toLowerCase().trim(),
+        debugInfo = { event: event, repo: pull.repo, number: pull.number, job: job};
 
-                            self.processArtifacts(project.name, build, pull);
-                        }
-                        else if (build.result === 'SUCCESS') {
-                            self.application.db.updateJobStatus(job.id, 'finished', build.result);
-                            self.application.emit('build.succeeded', job, pull, build.url);
+    self.application.log.debug('PR event', debugInfo);
+    self.application.emit(event, job, pull, build.url);
+    self.application.db.updatePRJobStatus(job.id, 'finished', build.result);
 
-                            self.processArtifacts(project.name, build, pull);
-                        }
-                        else if (build.result === 'ABORTED') {
-                            self.application.db.updateJobStatus(job.id, 'finished', build.result);
-                            self.application.emit('build.aborted', job, pull, build.url);
-                        }
-                    }
-                }
-            });
-        });
-    });
+    if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
+      self.processArtifacts(project.name, build, pull);
+    }
+  });
 };
 
 /**
- * Makes a GET request to the Jenkins API to start a build
+ * Similar to checkPRJob() but for pushes
+ *
+ * @method checkPushJob
+ * @param push {Object}
+ */
+Jenkins.prototype.checkPushJob = function(push) {
+  var self = this,
+      job = push.job,
+      project = this.config.push_projects[push.repo];
+
+  self.getBuildById(project.name, job.id, function(err, build) {
+    if (err || !build) {
+      return;
+    }
+
+    if (build.building) {
+      self.application.db.updatePushJobStatus(job.id, 'started', 'BUILDING');
+      return;
+    }
+
+    var event = 'push.build.' + build.result.toLowerCase().trim();
+
+    self.application.log.debug('Push updated', { project: project, job: job.id, event: event });
+    self.application.emit(event, build);
+    self.application.db.updatePushJobStatus(job.id, 'finished', build.result);
+
+    if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
+      self.processArtifacts(project.name, build, push);
+    }
+  });
+};
+
+/**
+ * GET to the Jenkins API to start a build
  *
  * @method triggerBuild
  * @param job_name {String}
@@ -368,57 +424,80 @@ Jenkins.prototype.checkJob = function(pull) {
  * @param callback {Function}
  */
 Jenkins.prototype.triggerBuild = function(job_name, url_options, callback) {
-    var options = {
-        url: url.format({
-            protocol: this.config.protocol,
-            host: this.config.host,
-            pathname: '/job/' + job_name + '/buildWithParameters',
-            query: url_options
-        }),
-        method: 'GET'
+  var options = {
+    url: url.format({
+      protocol: this.config.protocol,
+      host: this.config.host,
+      pathname: '/job/' + job_name + '/buildWithParameters',
+      query: url_options
+    }),
+    method: 'GET'
+  };
+
+  if (this.config.user && this.config.pass) {
+    options.headers = {
+      authorization: 'Basic ' + (new Buffer(this.config.user + ":" + this.config.pass, 'ascii').toString('base64'))
     };
+  }
 
-    if (this.config.user && this.config.pass) {
-        options.headers = {
-            authorization: 'Basic ' + (new Buffer(this.config.user + ":" + this.config.pass, 'ascii').toString('base64'))
-        };
-    }
+  this.application.log.debug('jenkins build trigger', options);
 
-    this.application.log.debug('jenkins build trigger', options);
-
-    request(options, callback);
+  this.request(options, callback);
 };
 
 /**
  * Checks the Jenkins API for the status of a job
  *
- * @method checkBuild
+ * @method getJobBuilds
  * @param job_name {String}
  * @param callback {Function}
  */
-Jenkins.prototype.checkBuild = function(job_name, callback) {
-    var self = this,
-        options = {
-            url: url.format({
-                protocol: this.config.protocol,
-                host: this.config.host,
-                pathname: '/job/' + job_name + '/api/json',
-                query: {
-                    tree: 'builds[number,url,actions[parameters[name,value]],building,result]'
-                }
-            }),
-            json: true
-        };
+Jenkins.prototype.getJobBuilds = function(job_name, callback) {
+  var self = this,
+      options = {
+        url: url.format({
+          protocol: this.config.protocol,
+          host: this.config.host,
+          pathname: '/job/' + job_name + '/api/json',
+          query: {
+            tree: 'builds[number,url,actions[parameters[name,value]],building,result]'
+          }
+        }),
+        json: true
+      };
 
-    if (this.config.user && this.config.pass) {
-        options.headers = {
-            authorization: 'Basic ' + (new Buffer(this.config.user + ":" + this.config.pass, 'ascii').toString('base64'))
-        };
+  if (this.config.user && this.config.pass) {
+    options.headers = {
+      authorization: 'Basic ' + (new Buffer(this.config.user + ":" + this.config.pass, 'ascii').toString('base64'))
+    };
+  }
+
+  self.request(options, function(error, response) {
+    if (error) {
+      self.application.log.error('error when getting job builds', error);
+      return;
     }
-
-    request(options, function(error, response) {
-        callback(error, response, self.application);
-    });
+    if (response.body && response.body.builds) {
+      response = response.body.builds.filter(function(build) {
+        return build.actions && build.actions.some(function(action) {
+          return !!action.parameters;
+        });
+      })
+      .map(function(build) {
+        build.url += 'consoleFull';
+        build.actions.forEach(function(action) {
+          if (action.parameters) {
+            build.parameters = action.parameters;
+          }
+        });
+        return build;
+      });
+    }
+    else {
+      error = 'invalid response - no builds';
+    }
+    callback(error, response);
+  });
 };
 
 /**
@@ -431,40 +510,40 @@ Jenkins.prototype.checkBuild = function(job_name, callback) {
  * @param pull {Object}
  */
 Jenkins.prototype.processArtifacts = function(job_name, build, pull) {
-    var options = {
-        url: url.format({
-            protocol: this.config.protocol,
-            host: this.config.host,
-            pathname: '/job/' + job_name + '/' + build.number + '/api/json',
-            query: {
-                tree: 'artifacts[fileName,relativePath]'
-            }
-        }),
-        json: true
-    };
+  var options = {
+    url: url.format({
+      protocol: this.config.protocol,
+      host: this.config.host,
+      pathname: '/job/' + job_name + '/' + build.number + '/api/json',
+      query: {
+        tree: 'artifacts[fileName,relativePath]'
+      }
+    }),
+    json: true
+  };
 
-    if (this.config.user && this.config.pass) {
-        options.headers = {
-            authorization: 'Basic ' + (new Buffer(this.config.user + ":" + this.config.pass, 'ascii').toString('base64'))
-        };
+  if (this.config.user && this.config.pass) {
+    options.headers = {
+      authorization: 'Basic ' + (new Buffer(this.config.user + ":" + this.config.pass, 'ascii').toString('base64'))
+    };
+  }
+
+  var self = this;
+  self.request(options, function(err, response) {
+    if (err) {
+      self.application.log.error(err);
+      return;
     }
 
-    var self = this;
-    request(options, function(err, response) {
-        if (err) {
-            self.application.log.error(err);
-            return;
-        }
+    self.application.log.debug('Retrieved artifacts for build', { build: build.number, project: job_name });
 
-        self.application.log.debug('Retrieved artifacts for build', { build: build.number, project: job_name });
+    response.body.artifacts.forEach(function(artifact) {
+      artifact.url = self.config.protocol + '://' + self.config.host + '/job/' + job_name + '/' + build.number + '/artifact/' + artifact.relativePath;
 
-        response.body.artifacts.forEach(function(artifact) {
-            artifact.url = self.config.protocol + '://' + self.config.host + '/job/' + job_name + '/' + build.number + '/artifact/' + artifact.relativePath;
-
-            self.application.log.debug('Found artifact for build', { build: build.number, url: artifact.url });
-            self.application.emit('build.artifact_found', build, pull, artifact);
-        });
+      self.application.log.debug('Found artifact for build', { build: build.number, url: artifact.url });
+      self.application.emit('build.artifact_found', build, pull, artifact);
     });
+  });
 };
 
 /**
@@ -476,28 +555,28 @@ Jenkins.prototype.processArtifacts = function(job_name, build, pull) {
  * @param url {String}
  */
 Jenkins.prototype.downloadArtifact = function(build, pull, artifact) {
-    var self = this,
-        options = { url: artifact.url };
+  var self = this,
+      options = { url: artifact.url };
 
-    if (this.config.user && this.config.pass) {
-        options.headers = {
-            authorization: 'Basic ' + (new Buffer(this.config.user + ":" + this.config.pass, 'ascii').toString('base64'))
-        };
+  if (this.config.user && this.config.pass) {
+    options.headers = {
+      authorization: 'Basic ' + (new Buffer(this.config.user + ":" + this.config.pass, 'ascii').toString('base64'))
+    };
+  }
+
+  self.request(options, function(err, response) {
+    if (err) {
+      self.application.log.error(err);
+      return;
     }
 
-    request(options, function(err, response) {
-        if (err) {
-            self.application.log.error(err);
-            return;
-        }
-
-        self.application.emit('build.artifact_downloaded', build, pull, artifact.relativePath, response.body);
-    });
+    self.application.emit('build.artifact_downloaded', build, pull, artifact.relativePath, response.body);
+  });
 };
 
 /**
  * Utility function to load this "plugin" into the application without having to know the object name
  */
-exports.init = function(config, application) {
-    return new Jenkins(config, application);
+exports.init = function(config, application, idGenerator, request) {
+  return new Jenkins(config, application, idGenerator, request);
 };

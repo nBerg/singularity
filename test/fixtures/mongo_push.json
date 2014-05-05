@@ -1,0 +1,10 @@
+{
+  "ref": "refs/heads/master",
+  "sha": "adkjhfbajsdhfvakdsf",
+  "repo": "test_repo",
+  "job": {
+    "id": "asdfahr-sadfasd-1351g",
+    "status": "finished",
+    "result": "FAILURE"
+  }
+}

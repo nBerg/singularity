@@ -9,8 +9,8 @@ exports.init = function(config, log) {
     return null;
   }
 
-  // mongo abstraction layer
   var MongoDB = function() {
+    this.config = config;
     this.connection = require('mongojs').connect(config.auth, config.collections);
     this.connection.pulls.ensureIndex({number: 1, repo_id: 1 }, { unique: true, sparse: true }, function(err, res) {
       if (err) {
@@ -31,7 +31,6 @@ exports.init = function(config, log) {
     }, callback);
   };
 
-  // push methods
   MongoDB.prototype.findPush = function(repo, ref, head, callback) {
     this.connection.pushes.findOne({ repo: repo, ref: ref, sha: head }, callback);
   };
@@ -40,11 +39,10 @@ exports.init = function(config, log) {
     this.connection.pushes.insert({
       repo: push.repository.name,
       ref: push.ref,
-      sha: push.after
+      sha: push.after,
     }, callback);
   };
 
-  // pull methods
   MongoDB.prototype.findPull = function(pull_number, pull_repo, callback) {
     this.connection.pulls.findOne({ number: pull_number, repo: pull_repo }, callback);
   };
@@ -81,11 +79,14 @@ exports.init = function(config, log) {
     this.connection.pulls.find({ repo_id: repo, status: { $in: statuses } }).limit(limit, callback);
   };
 
-  MongoDB.prototype.findPullsByJobStatus = function(statuses, callback) {
+  MongoDB.prototype.findByJobStatus = function(statuses, callback) {
     this.connection.pulls.find({ 'jobs.status': { $in: statuses }}).forEach(callback);
   };
 
-  // job methods
+  MongoDB.prototype.findPushJobsByStatus = function(statuses, callback) {
+    this.connection.pushes.find({ 'job.status': { $in: statuses } }).forEach(callback);
+  };
+
   MongoDB.prototype.insertJob = function(pull, job) {
     if (typeof pull.jobs === 'undefined') {
       pull.jobs = [];
@@ -96,11 +97,31 @@ exports.init = function(config, log) {
     this.updatePull(pull.number, pull.repo, { jobs: pull.jobs});
   };
 
-  MongoDB.prototype.updateJobStatus = function(job_id, status, result) {
+  MongoDB.prototype.insertPushJob = function(push, job_id) {
+    var query = {
+      ref: push.ref,
+      repo: push.repository.name,
+      sha: push.after
+    };
+    this.findPush(push.repository.name, push.ref, push.after, function(err, res) {
+      // something went terribly wrong, SHOULD die
+      if (err) {
+        log.error('failed to insert a push job', err);
+        process.exit(1);
+      }
+
+      this.connection.pushes.update(query, { $set: { 'job.id': job_id, 'job.result': 'BUILDING', 'job.status': 'new' } });
+    }.bind(this));
+  };
+
+  MongoDB.prototype.updatePushJobStatus = function(job_id, status, result) {
+    this.connection.pushes.update({ 'job.id': job_id }, { $set: { 'job.status': status, 'job.result': result }});
+  };
+
+  MongoDB.prototype.updatePRJobStatus = function(job_id, status, result) {
     this.connection.pulls.update({ 'jobs.id': job_id }, { $set: { 'jobs.$.status': status, 'jobs.$.result': result }});
   };
 
-  // inline status methods
   MongoDB.prototype.insertLineStatus = function(pull, filename, line_number) {
     this.connection.pulls.update({ _id: pull.number, 'files.filename': filename }, { $push: { 'files.$.reported': line_number } });
   };
