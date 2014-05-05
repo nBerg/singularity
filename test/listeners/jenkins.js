@@ -7,7 +7,7 @@ var sinon = require('sinon'),
 
 chai.use(require('sinon-chai'));
 
-describe('Jenkins', function() {
+describe('listeners/jenkins', function() {
   var test = this;
   test.mongoPush = require('../fixtures/mongo_push');
 

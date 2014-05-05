@@ -3,7 +3,7 @@ var expect = require('chai').expect,
     sinon = require('sinon'),
     Singularity = require('../../libraries/singularity');
 
-describe('Singularity', function() {
+describe('libraries/singularity', function() {
   var test = this,
       checkSparseConfig = function(config) {
         expect(config).to.have.keys(['github', 'jenkins']);

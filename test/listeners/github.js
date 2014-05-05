@@ -3,7 +3,7 @@ var sinon = require('sinon'),
     Emitter = require('events').EventEmitter,
     GitHub = require('../../listeners/github');
 
-describe('Github', function() {
+describe('listeners/github', function() {
   var test = this;
 
   beforeEach(function() {
