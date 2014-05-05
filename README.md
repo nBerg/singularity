@@ -5,6 +5,8 @@ Singularity [![Build Status](https://travis-ci.org/behance/singularity.svg?branc
 
 A refactored form of SnapInteractive's [Mergeatron](https://github.com/SnapInteractive/mergeatron), sitting behind an [express.js](https://github.com/visionmedia/express) application (v4.x).
 
+We use TravisCI for this repo because **our** instance of mergeatron is behind a VPC/firewall, so no pretty badge or link to test console for master ;)
+
 ###Main differences:
 
 - data schema has a few additions
