@@ -95,7 +95,7 @@ Jenkins.prototype.start = function() {
   async.parallel({
     jenkins: function() {
       var run_jenkins = function() {
-        self.application.db.findByJobStatus('pulls', ['new', 'started'], function(err, pull) {
+        self.application.db.findByJobStatus(['new', 'started'], function(err, pull) {
           if (err) {
             self.application.log.error(err);
             process.exit(1);
@@ -106,7 +106,7 @@ Jenkins.prototype.start = function() {
           self.checkPRJob(pull);
         });
 
-        self.application.db.findByJobStatus('pushes', ['new', 'started'], function(err, push) {
+        self.application.db.findPushJobsByStatus(['new', 'started'], function(err, push) {
           if (err) {
             self.application.log.error(err);
             process.exit(1);
@@ -361,7 +361,7 @@ Jenkins.prototype.checkPRJob = function(pull) {
     }
 
     if (job.status === 'new') {
-      self.application.db.updateJobStatus('pulls', job.id, 'started', 'BUILDING');
+      self.application.db.updatePRJobStatus(job.id, 'started', 'BUILDING');
       self.application.emit('build.started', job, pull, build.url);
     }
 
@@ -374,7 +374,7 @@ Jenkins.prototype.checkPRJob = function(pull) {
 
     self.application.log.debug('PR event', debugInfo);
     self.application.emit(event, job, pull, build.url);
-    self.application.db.updateJobStatus('pulls', job.id, 'finished', build.result);
+    self.application.db.updatePRJobStatus(job.id, 'finished', build.result);
 
     if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
       self.processArtifacts(project.name, build, pull);
@@ -389,25 +389,27 @@ Jenkins.prototype.checkPRJob = function(pull) {
  * @param push {Object}
  */
 Jenkins.prototype.checkPushJob = function(push) {
-  var job = push.jobs[0],
-      project = this.config.push_projects[push.repo],
-      build = this.getBuildById(project.name, job.id);
+  var self = this,
+      job = push.job,
+      project = this.config.push_projects[push.repo];
 
-  if (!build) {
-    return;
-  }
+  self.getBuildById(project.name, job.id, function(err, build) {
+    if (err || !build) {
+      return;
+    }
 
-  if (build.building) {
-    this.application.db.updateJobStatus('pushes', job.id, 'started', 'BUILDING');
-    return;
-  }
+    if (build.building) {
+      self.application.db.updatePushJobStatus(job.id, 'started', 'BUILDING');
+      return;
+    }
 
-  this.application.log.debug('Push updated', { project: project, push: push, job: job});
-  this.application.db.updateJobStatus('pushes', job.id, 'finished', build.result);
+    self.application.log.debug('Push updated', { project: project, job: job.id});
+    self.application.db.updatePushJobStatus(job.id, 'finished', build.result);
 
-  if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
-    this.processArtifacts(project.name, build, push);
-  }
+    if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
+      self.processArtifacts(project.name, build, push);
+    }
+  });
 };
 
 /**

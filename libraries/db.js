@@ -40,7 +40,6 @@ exports.init = function(config, log) {
       repo: push.repository.name,
       ref: push.ref,
       sha: push.after,
-      jobs: []
     }, callback);
   };
 
@@ -80,12 +79,12 @@ exports.init = function(config, log) {
     this.connection.pulls.find({ repo_id: repo, status: { $in: statuses } }).limit(limit, callback);
   };
 
-  MongoDB.prototype.findByJobStatus = function(collection, statuses, callback) {
-    if (this.config.collections.indexOf(collection) === -1) {
-      log.error('unknown collection', collection);
-      return;
-    }
-    this.connection[collection].find({ 'jobs.status': { $in: statuses }}).forEach(callback);
+  MongoDB.prototype.findByJobStatus = function(statuses, callback) {
+    this.connection.pulls.find({ 'jobs.status': { $in: statuses }}).forEach(callback);
+  };
+
+  MongoDB.prototype.findPushJobsByStatus = function(statuses, callback) {
+    this.connection.pushes.find({ 'job.status': { $in: statuses } }).forEach(callback);
   };
 
   MongoDB.prototype.insertJob = function(pull, job) {
@@ -111,23 +110,16 @@ exports.init = function(config, log) {
         process.exit(1);
       }
 
-      if (res.jobs.length > 0) {
-        log.error('job has a build associated with it', {push: query, existing: res});
-        return;
-      }
-
-      res.jobs.push({ id: job_id, status: 'new', result: null });
-      this.connection.pushes.update(query, { $set: res });
+      this.connection.pushes.update(query, { $set: { 'job.id': job_id, 'job.result': 'BUILDING', 'job.status': 'new' } });
     }.bind(this));
   };
 
-  MongoDB.prototype.updateJobStatus = function(collection, job_id, status, result) {
-    if (this.config.collections.indexOf(collection) === -1) {
-      log.error('unknown collection', collection);
-      return;
-    }
+  MongoDB.prototype.updatePushJobStatus = function(job_id, status, result) {
+    this.connection.pushes.update({ 'job.id': job_id }, { $set: { 'job.status': status, 'job.result': result }});
+  };
 
-    this.connection[collection].update({ 'jobs.id': job_id }, { $set: { 'jobs.$.status': status, 'jobs.$.result': result }});
+  MongoDB.prototype.updatePRJobStatus = function(job_id, status, result) {
+    this.connection.pulls.update({ 'jobs.id': job_id }, { $set: { 'jobs.$.status': status, 'jobs.$.result': result }});
   };
 
   MongoDB.prototype.insertLineStatus = function(pull, filename, line_number) {

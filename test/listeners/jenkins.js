@@ -85,12 +85,13 @@ describe('Jenkins', function() {
       var getBuildStub = sinon.stub(test.jenkins, 'getBuildById'),
           dbSpy = sinon.spy();
 
-      test.jenkins.application.db = { updateJobStatus: function() {} };
-      sinon.stub(test.jenkins.application.db, 'updateJobStatus', dbSpy);
-      getBuildStub.returns({ building: true });
+      test.jenkins.application.db = { updatePushJobStatus: function() {} };
+      sinon.stub(test.jenkins.application.db, 'updatePushJobStatus', dbSpy);
+      getBuildStub.callsArgWith(2, null, { building: true });
 
-      expect(test.jenkins.checkPushJob(test.mongoPush)).to.be.undefined;
+      test.jenkins.checkPushJob(test.mongoPush);
       expect(dbSpy).to.have.been.calledOnce;
+      expect(dbSpy).to.have.been.calledWithExactly(test.mongoPush.job.id, 'started', 'BUILDING');
     });
 
     it('updates finished build statuses', function() {
@@ -99,15 +100,16 @@ describe('Jenkins', function() {
           logSpy = sinon.spy(),
           artifactSpy = sinon.spy();
 
-      test.jenkins.application.db = { updateJobStatus: function() {} };
+      test.jenkins.application.db = { updatePushJobStatus: function() {} };
       test.jenkins.application.log = { debug: function() {} };
-      sinon.stub(test.jenkins.application.db, 'updateJobStatus', dbSpy);
+      sinon.stub(test.jenkins.application.db, 'updatePushJobStatus', dbSpy);
       sinon.stub(test.jenkins.application.log, 'debug', logSpy);
       sinon.stub(test.jenkins, 'processArtifacts', artifactSpy);
-      getBuildStub.returns({ building: false, result: "FAILURE" });
+      getBuildStub.callsArgWith(2, null, { building: false, result: "FAILURE" });
 
       expect(test.jenkins.checkPushJob(test.mongoPush)).to.be.undefined;
       expect(dbSpy).to.have.been.calledOnce;
+      expect(dbSpy).to.have.been.calledWithExactly(test.mongoPush.job.id, 'finished', 'FAILURE');
       expect(logSpy).to.have.been.calledOnce;
       expect(artifactSpy).to.have.been.calledOnce;
     });
