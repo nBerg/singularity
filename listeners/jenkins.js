@@ -403,7 +403,10 @@ Jenkins.prototype.checkPushJob = function(push) {
       return;
     }
 
-    self.application.log.debug('Push updated', { project: project, job: job.id});
+    var event = 'push.build.' + build.result.toLowerCase().trim();
+
+    self.application.log.debug('Push updated', { project: project, job: job.id, event: event });
+    self.application.emit(event, build);
     self.application.db.updatePushJobStatus(job.id, 'finished', build.result);
 
     if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {

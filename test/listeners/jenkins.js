@@ -98,10 +98,12 @@ describe('listeners/jenkins', function() {
       var getBuildStub = sinon.stub(test.jenkins, 'getBuildById'),
           dbSpy = sinon.spy(),
           logSpy = sinon.spy(),
+          emitSpy = sinon.spy(),
           artifactSpy = sinon.spy();
 
       test.jenkins.application.db = { updatePushJobStatus: function() {} };
       test.jenkins.application.log = { debug: function() {} };
+      sinon.stub(test.jenkins.application, 'emit', emitSpy);
       sinon.stub(test.jenkins.application.db, 'updatePushJobStatus', dbSpy);
       sinon.stub(test.jenkins.application.log, 'debug', logSpy);
       sinon.stub(test.jenkins, 'processArtifacts', artifactSpy);
@@ -110,6 +112,8 @@ describe('listeners/jenkins', function() {
       expect(test.jenkins.checkPushJob(test.mongoPush)).to.be.undefined;
       expect(dbSpy).to.have.been.calledOnce;
       expect(dbSpy).to.have.been.calledWithExactly(test.mongoPush.job.id, 'finished', 'FAILURE');
+      expect(emitSpy).to.have.been.calledOnce;
+      expect(emitSpy).to.have.been.calledWith('push.build.failure');
       expect(logSpy).to.have.been.calledOnce;
       expect(artifactSpy).to.have.been.calledOnce;
     });
