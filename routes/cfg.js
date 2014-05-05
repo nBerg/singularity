@@ -18,7 +18,7 @@ exports.init = function(app) {
       }
     });
 
-    app.addRepoJobPair(request.query);
+    app.addRepoPRJob(request.query);
     response.send(200, response_obj);
   });
 
