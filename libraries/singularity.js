@@ -143,7 +143,8 @@ module.exports = function(config) {
       token: params.token || false
     });
 
-    app.emit('singularity.config_updated', app.config);
+    app.emit('singularity.github.config_updated', app.config.plugins.github);
+    app.emit('singularity.jenkins.config_updated', app.config.plugins.jenkins);
     app.log.info('config updated', app.config);
 
     return true;

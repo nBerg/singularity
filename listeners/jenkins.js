@@ -18,10 +18,14 @@ var request = require('request'),
 var Jenkins = function(config, application, idGen, requester) {
   var self = this;
 
-  self. request = requester || request;
+  self.request = requester || request;
   self.uuid = idGen || uuid;
   self.config = config;
   self.application = application;
+
+  self.application.on('singularity.jenkins.config_updated', function(config) {
+    self.config = config;
+  });
 
   self.application.on('push.found', function(push) {
     self.pushFound(push);

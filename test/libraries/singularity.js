@@ -1,7 +1,9 @@
-var expect = require('chai').expect,
-    assert = require('chai').assert,
+var chai = require('chai'),
+    expect = chai.expect,
     sinon = require('sinon'),
     Singularity = require('../../libraries/singularity');
+
+chai.use(require('sinon-chai'));
 
 describe('libraries/singularity', function() {
   var test = this,
@@ -10,14 +12,14 @@ describe('libraries/singularity', function() {
 
         expect(config.github).to.have.keys(['ci_user', 'repositories']);
         expect(config.github.ci_user).to.be.false;
-        assert.isArray(config.github.repositories);
+        expect(config.github.repositories).to.be.an('Array');
         expect(config.github.repositories).to.be.empty;
 
         expect(config.jenkins).to.have.keys(['has_global_trigger_token', 'projects', 'push_projects']);
         expect(config.jenkins.has_global_trigger_token).to.be.false;
-        assert.isArray(config.jenkins.projects);
+        expect(config.jenkins.projects).to.be.an('Array');
         expect(config.jenkins.projects).to.be.empty;
-        assert.isArray(config.jenkins.push_projects);
+        expect(config.jenkins.push_projects).to.be.an('Array');
         expect(config.jenkins.push_projects).to.be.empty;
       };
 
@@ -101,36 +103,37 @@ describe('libraries/singularity', function() {
     it('does not update when repo is already in github config', function() {
       var args = { repo: 'test_repo', project: 'test_repo_project' };
       expect(self.app.addRepoPRJob(args)).to.be.false;
-      assert(self.logSpy.withArgs('duplicate github repo', args).calledOnce);
-      assert(self.emitSpy.withArgs('singularity.config_updated', self.app.config).notCalled);
+      expect(self.logSpy).to.have.been.calledWithExactly('duplicate github repo', args);
+      expect(self.emitSpy).to.not.have.been.called;
     });
 
     it('does not update when repo is already in a jenkins config', function() {
       var args = { repo: 'test_repo2', project: 'new_test_repo2_project' };
       expect(self.app.addRepoPRJob(args)).to.be.false;
-      assert(self.logSpy.withArgs('duplicate jenkins repo or project', args).calledOnce);
-      assert(self.emitSpy.withArgs('singularity.config_updated', self.app.config).notCalled);
+      expect(self.logSpy).to.have.been.calledWithExactly('duplicate jenkins repo or project', args);
+      expect(self.emitSpy).to.not.have.been.called;
     });
 
     it('does not update when project is already in a jenkins config', function() {
       var args = { repo: 'new_test_repo', project: 'test_repo2_project' };
       expect(self.app.addRepoPRJob(args)).to.be.false;
-      assert(self.logSpy.withArgs('duplicate jenkins repo or project', args).calledOnce);
-      assert(self.emitSpy.withArgs('singularity.config_updated', self.app.config).notCalled);
+      expect(self.logSpy).to.have.been.calledWithExactly('duplicate jenkins repo or project', args);
+      expect(self.emitSpy).to.not.have.been.called;
     });
 
     it('actually updates properly', function() {
       var args = { repo: 'new_test_repo', project: 'new_test_project' };
 
       expect(self.app.addRepoPRJob(args)).to.be.true;
-      assert(self.logSpy.withArgs('config updated', self.app.config).calledOnce);
-      assert(self.emitSpy.withArgs('singularity.config_updated', self.app.config).calledOnce);
+      expect(self.logSpy).to.have.been.calledWithExactly('config updated', self.app.config);
+      expect(self.emitSpy).to.have.been.calledWithExactly('singularity.jenkins.config_updated', self.app.config.plugins.jenkins);
+      expect(self.emitSpy).to.have.been.calledWithExactly('singularity.github.config_updated', self.app.config.plugins.github);
 
       var plugins = self.app.config.plugins,
           expectedCfg = { repo: 'new_test_repo', name: 'new_test_project', token: false };
 
-      assert.include(plugins.github.repos, 'new_test_repo', 'new git repo was added to the github config');
-      assert.include(plugins.jenkins.projects, expectedCfg, 'generated a new jenkins job config');
+      expect(plugins.github.repos).to.include('new_test_repo');
+      expect(plugins.jenkins.projects).to.include(expectedCfg);
     });
   });
 });
