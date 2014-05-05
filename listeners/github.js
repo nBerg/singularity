@@ -32,6 +32,7 @@ var GitHub = function(config, application, events) {
   self.api.authenticate(config.auth);
 
   self.application.on('singularity.github.config_updated', function(config) {
+    self.application.log.info('github: updated config');
     self.config = config;
   });
 

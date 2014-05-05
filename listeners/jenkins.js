@@ -24,6 +24,7 @@ var Jenkins = function(config, application, idGen, requester) {
   self.application = application;
 
   self.application.on('singularity.jenkins.config_updated', function(config) {
+    self.application.log.info('jenkins: updated config');
     self.config = config;
   });
 
