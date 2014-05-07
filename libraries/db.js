@@ -73,10 +73,18 @@ exports.init = function(config, log) {
     }, callback);
   };
 
-  MongoDB.prototype.findRepoPullsByStatuses = function(repo, statuses, limit, callback) {
-    limit = parseInt(limit) || 8;
-    repo = parseInt(repo);
-    this.connection.pulls.find({ repo_id: repo, status: { $in: statuses } }).limit(limit, callback);
+  MongoDB.prototype.findRepoPullsByStatuses = function(params, callback) {
+    var limit = parseInt(params.limit) || 8,
+        repo = parseInt(params.repo),
+        sort = params.sort && ('ascending' === params.sort) ? 1 : -1,
+        statuses = params.statuses ? params.statuses.split(',') : ['open'];
+
+    if (!!!repo) {
+      callback('no repo given, or invalid value', null);
+      return;
+    }
+
+    this.connection.pulls.find({ repo_id: repo, status: { $in: statuses } }).sort([['_id', sort]]).limit(limit, callback);
   };
 
   MongoDB.prototype.findByJobStatus = function(statuses, callback) {
