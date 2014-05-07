@@ -12,11 +12,9 @@ exports.init = function(app) {
       return;
     }
 
-    var statuses = request.query.status && request.query.status.split(',') || ['open'];
-
-    app.db.findRepoPullsByStatuses(request.query.repo, statuses, request.query.limit, function(err, item) {
+    app.db.findRepoPullsByStatuses(request.query, function(err, item) {
       if (err) {
-        app.log.error('pull_requests query error!', { repo: request.query.repo, statuses: statuses, limit: request.query.limit, err: err });
+        app.log.error('pull_requests query error!', err);
         response.send(500, response_obj);
         return;
       }
