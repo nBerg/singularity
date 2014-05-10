@@ -1,14 +1,19 @@
 var sinon = require('sinon'),
-    assert = require('assert'),
+    chai = require('chai'),
+    expect = chai.expect,
     Emitter = require('events').EventEmitter,
     GitHub = require('../../listeners/github');
+
+chai.use(require('sinon-chai'));
 
 describe('listeners/github', function() {
   var test = this;
 
   beforeEach(function() {
-    test.events = new Emitter();
-    test.github = GitHub.init({}, test.events, test.events);
+    test.app = new Emitter();
+    test.app.log = { info: function() {} };
+    test.config = {repos: ['old_repo']};
+    test.github = GitHub.init(test.config, test.app);
   });
 
   describe('handlePush', function(done) {
@@ -17,9 +22,9 @@ describe('listeners/github', function() {
 
       sinon.stub(test.github, 'handlePush', handlePushSpy);
 
-      test.events.emit('push', 'dummy');
+      test.app.emit('push', 'dummy');
 
-      assert(handlePushSpy.calledWith('dummy'));
+      expect(handlePushSpy).to.be.calledWith('dummy');
     });
   });
 
@@ -29,9 +34,9 @@ describe('listeners/github', function() {
 
       sinon.stub(test.github, 'handleIssueComment', handleIssueCommentSpy);
 
-      test.events.emit('issue_comment', 'dummy');
+      test.app.emit('issue_comment', 'dummy');
 
-      assert(handleIssueCommentSpy.calledWith('dummy'));
+      expect(handleIssueCommentSpy).to.be.calledWith('dummy');
     });
   });
 
@@ -41,13 +46,33 @@ describe('listeners/github', function() {
 
       sinon.stub(test.github, 'handlePullRequest', handlePRSpy);
 
-      test.events.emit('pull_request', 'application_emit');
-      test.events.emit('pull_request', 'self_emit');
+      test.app.emit('pull_request', 'application_emit');
+      test.app.emit('pull_request', 'self_emit');
 
-      // each one should be called twice, since the internal emitter AND application
-      // are the same object
-      assert(handlePRSpy.withArgs('application_emit').calledTwice);
-      assert(handlePRSpy.withArgs('self_emit').calledTwice);
+      expect(handlePRSpy).to.have.been.calledTwice;
+      expect(handlePRSpy).to.have.been.calledWith('application_emit');
+      expect(handlePRSpy).to.have.been.calledWith('self_emit');
+    });
+  });
+
+  describe('setupRepoHooks', function(done) {
+    it('ignores repos in config', function() {
+      var webhookSpy = sinon.spy();
+      sinon.stub(test.github, 'createWebhook', webhookSpy);
+
+      test.github.setupRepoHooks(test.config.repos);
+
+      expect(webhookSpy).to.not.have.been.called;
+    });
+
+    it('filters repos', function() {
+      var webhookSpy = sinon.spy();
+      sinon.stub(test.github, 'createWebhook', webhookSpy);
+
+      test.github.setupRepoHooks(['new_repo']);
+
+      expect(webhookSpy).to.have.been.calledOnce;
+      expect(webhookSpy).to.have.been.calledWith('new_repo');
     });
   });
 });
