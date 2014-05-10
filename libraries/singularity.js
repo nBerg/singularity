@@ -150,5 +150,9 @@ module.exports = function(config) {
     return true;
   };
 
+  app.getDomain = function() {
+    return (config.host || 'localhost') + ':' + config.port;
+  };
+
   return app;
 };

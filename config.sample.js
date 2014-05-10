@@ -1,4 +1,11 @@
 exports.config = {
+  // used to create webhooks. port is appended to this
+  // so no trailing slash!
+  host: 'http://your.hosts.domain',
+  // port that express will run on
+  port: '8080',
+  // info or debug
+  log_level: 'debug',
   db: {
     type: 'mongo',
     auth: {
@@ -11,11 +18,10 @@ exports.config = {
     },
     collections: [ 'pulls', 'pushes', 'merges' ]
   },
-  log_level: 'debug',
-  port: '8080',
   plugins: {
     github: {
       method: 'hooks',
+      // passed directly into the github module so username & password works too
       auth: {
         type: 'oauth',
         token: 'CI-USER-TOKEN',

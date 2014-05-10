@@ -32,8 +32,9 @@ var GitHub = function(config, application, events) {
   self.api.authenticate(config.auth);
 
   self.application.on('singularity.github.config_updated', function(config) {
-    self.application.log.info('github: updated config');
+    self.setupRepoHooks(config.repos || []);
     self.config = config;
+    self.application.log.info('github: updated config');
   });
 
   self.application.on('pull.validated', function(pull) {
@@ -500,6 +501,63 @@ GitHub.prototype.handlePush = function(payload) {
       self.application.emit('push.found', payload);
     });
   });
+};
+
+/**
+ * Create / configure webhooks for a given list of repos
+ *
+ * @method setupRepoHooks
+ * @param repos {Array}
+ */
+GitHub.prototype.setupRepoHooks = function(repos, callback) {
+  var self = this;
+  repos = repos.filter(function(repo) {
+    return self.config.repos.indexOf(repo) === -1;
+  });
+
+  if (repos.length === 0) {
+    self.application.log.info('No new repos to configure webhooks for');
+    return;
+  }
+
+  repos.forEach(function(repo) {
+    self.createWebhook(repo, function(err, res) {
+      if (err) {
+        self.application.log.error('Failed to create webhook', { repo: repo });
+        return;
+      }
+
+      self.application.log.info('Webhook added for repo', { repo: repo, result: res });
+    });
+  });
+};
+
+/**
+ * Create webhook for a given repo
+ *
+ * @method createWebhook
+ * @param repo {String}
+ */
+GitHub.prototype.createWebhook = function(repo, callback) {
+  var self = this;
+
+  self.api.repos.createHook({
+      user: self.config.user,
+      repo: repo,
+      name: 'web',
+      active: true,
+      events: [
+        'pull_request',
+        'issue_comment',
+        'push'
+      ],
+      config: {
+        url: self.application.getDomain(),
+        content_type: 'json'
+      }
+    },
+    callback
+  );
 };
 
 /**
