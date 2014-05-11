@@ -49,7 +49,8 @@ describe('listeners/jenkins', function() {
       sinon.stub(test.jenkins, 'checkPushJob', pushJobSpy);
       sinon.stub(test.app.log, 'error', logSpy);
 
-      expect(test.jenkins.start()).to.be.null;
+      test.jenkins.start();
+
       expect(logSpy).to.have.been.calledOnce;
       expect(prJobSpy).to.not.have.been.called;
       expect(pushJobSpy).to.not.have.been.called;

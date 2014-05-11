@@ -136,15 +136,12 @@ module.exports = function(config) {
       return false;
     }
 
-    app.config.plugins.github.repos.push(params.repo);
-    app.config.plugins.jenkins.projects.push({
+    app.emit('github.new_repo', params.repo);
+    app.emit('jenkins.new_pr_job', {
       name: params.project,
       repo: params.repo,
       token: params.token || false
     });
-
-    app.emit('singularity.github.config_updated', app.config.plugins.github);
-    app.emit('singularity.jenkins.config_updated', app.config.plugins.jenkins);
     app.log.info('config updated', app.config);
 
     return true;

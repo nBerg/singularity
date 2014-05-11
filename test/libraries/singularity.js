@@ -126,14 +126,8 @@ describe('libraries/singularity', function() {
 
       expect(self.app.addRepoPRJob(args)).to.be.true;
       expect(self.logSpy).to.have.been.calledWithExactly('config updated', self.app.config);
-      expect(self.emitSpy).to.have.been.calledWithExactly('singularity.jenkins.config_updated', self.app.config.plugins.jenkins);
-      expect(self.emitSpy).to.have.been.calledWithExactly('singularity.github.config_updated', self.app.config.plugins.github);
-
-      var plugins = self.app.config.plugins,
-          expectedCfg = { repo: 'new_test_repo', name: 'new_test_project', token: false };
-
-      expect(plugins.github.repos).to.include('new_test_repo');
-      expect(plugins.jenkins.projects).to.include(expectedCfg);
+      expect(self.emitSpy).to.have.been.calledWith('jenkins.new_pr_job');
+      expect(self.emitSpy).to.have.been.calledWithExactly('github.new_repo', 'new_test_repo');
     });
   });
 });

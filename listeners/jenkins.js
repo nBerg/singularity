@@ -23,9 +23,9 @@ var Jenkins = function(config, application, idGen, requester) {
   self.config = config;
   self.application = application;
 
-  self.application.on('singularity.jenkins.config_updated', function(config) {
+  self.application.on('jenkins.new_pr_job', function(job) {
+    self.config.projects.push(job);
     self.application.log.info('jenkins: updated config');
-    self.config = config;
   });
 
   self.application.on('push.found', function(push) {
@@ -98,7 +98,7 @@ Jenkins.prototype.findProjectByRepo = function(repo) {
 Jenkins.prototype.start = function() {
   if (!this.application.db) {
     this.application.log.error('Jenkins Listener: missing app db... (╯°□°）╯︵ ┻━┻');
-    return null;
+    return this;
   }
 
   var self = this;
