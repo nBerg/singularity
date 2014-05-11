@@ -1,4 +1,5 @@
-var sinon = require('sinon'),
+var Logger = require('../../libraries/log'),
+    sinon = require('sinon'),
     assert = require('assert'),
     chai = require('chai'),
     expect = chai.expect,
@@ -14,6 +15,7 @@ describe('listeners/jenkins', function() {
   beforeEach(function(done) {
     test.events = new Emitter();
     test.app = new Emitter();
+    test.app.log = new Logger('debug');
     test.generator = {v1: function() { return 'test-id'; }};
     test.config = {
       protocol: 'http',
@@ -35,6 +37,23 @@ describe('listeners/jenkins', function() {
     };
 
     done();
+  });
+
+  describe('start', function() {
+    it('it does not when there is no db connection', function() {
+      var prJobSpy = sinon.spy(),
+          pushJobSpy = sinon.spy(),
+          logSpy = sinon.spy();
+
+      sinon.stub(test.jenkins, 'checkPRJob', prJobSpy);
+      sinon.stub(test.jenkins, 'checkPushJob', pushJobSpy);
+      sinon.stub(test.app.log, 'error', logSpy);
+
+      expect(test.jenkins.start()).to.be.null;
+      expect(logSpy).to.have.been.calledOnce;
+      expect(prJobSpy).to.not.have.been.called;
+      expect(pushJobSpy).to.not.have.been.called;
+    });
   });
 
   describe('buildPush', function() {

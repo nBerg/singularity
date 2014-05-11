@@ -96,6 +96,11 @@ Jenkins.prototype.findProjectByRepo = function(repo) {
  * @method start
  */
 Jenkins.prototype.start = function() {
+  if (!this.application.db) {
+    this.application.log.error('Jenkins Listener: missing app db... (╯°□°）╯︵ ┻━┻');
+    return null;
+  }
+
   var self = this;
   async.parallel({
     jenkins: function() {
