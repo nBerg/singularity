@@ -34,12 +34,12 @@ var GitHub = function(config, application, events) {
   self.application.on('github.new_repo', function(repo) {
     self.setupRepoHook(repo, function(err, res) {
       if (err) {
-        self.application.log.error(err);
+        self.application.log.error(err, res);
         return;
       }
 
       self.config.repos.push(repo);
-      self.application.log.info('Github Listener: updated config & hook', { repo: repo });
+      self.application.log.info('Github Listener: updated config & hook', { repo: repo, api_res: res });
     });
   });
 
@@ -517,7 +517,7 @@ GitHub.prototype.handlePush = function(payload) {
 /**
  * Create / configure webhooks for a given list of repos
  *
- * @method setupRepoHooks
+ * @method setupRepoHook
  * @param repos {Array}
  */
 GitHub.prototype.setupRepoHook = function(repo, callback) {
@@ -530,7 +530,7 @@ GitHub.prototype.setupRepoHook = function(repo, callback) {
 
   self.createWebhook(repo, function(err, res) {
     if (err) {
-      callback('Failed to create webhook', { repo: repo });
+      callback('Failed to create webhook', { repo: repo, error: err });
       return;
     }
 
@@ -562,7 +562,9 @@ GitHub.prototype.createWebhook = function(repo, callback) {
         content_type: 'json'
       }
     },
-    callback
+    function(err, res) {
+      callback(err, res);
+    }
   );
 };
 
