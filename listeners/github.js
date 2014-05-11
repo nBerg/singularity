@@ -31,10 +31,16 @@ var GitHub = function(config, application, events) {
 
   self.api.authenticate(config.auth);
 
-  self.application.on('singularity.github.config_updated', function(config) {
-    self.setupRepoHooks(config.repos || []);
-    self.config = config;
-    self.application.log.info('github: updated config');
+  self.application.on('github.new_repo', function(repo) {
+    self.setupRepoHook(repo, function(err, res) {
+      if (err) {
+        self.application.log.error(err);
+        return;
+      }
+
+      self.config.repos.push(repo);
+      self.application.log.info('Github Listener: updated config & hook', { repo: repo });
+    });
   });
 
   self.application.on('pull.validated', function(pull) {
@@ -89,6 +95,11 @@ var GitHub = function(config, application, events) {
  * @method start
  */
 GitHub.prototype.start = function() {
+  if (!this.application.db) {
+    this.application.log.error('Github Listener: missing app db... (╯°□°）╯︵ ┻━┻');
+    return this;
+  }
+
   if (this.config.method === 'hooks') {
     this.checkRepos();
   }
@@ -509,26 +520,21 @@ GitHub.prototype.handlePush = function(payload) {
  * @method setupRepoHooks
  * @param repos {Array}
  */
-GitHub.prototype.setupRepoHooks = function(repos, callback) {
+GitHub.prototype.setupRepoHook = function(repo, callback) {
   var self = this;
-  repos = repos.filter(function(repo) {
-    return self.config.repos.indexOf(repo) === -1;
-  });
 
-  if (repos.length === 0) {
-    self.application.log.info('No new repos to configure webhooks for');
+  if (self.config.repos.indexOf(repo) !== -1) {
+    callback('repo already configured', null);
     return;
   }
 
-  repos.forEach(function(repo) {
-    self.createWebhook(repo, function(err, res) {
-      if (err) {
-        self.application.log.error('Failed to create webhook', { repo: repo });
-        return;
-      }
+  self.createWebhook(repo, function(err, res) {
+    if (err) {
+      callback('Failed to create webhook', { repo: repo });
+      return;
+    }
 
-      self.application.log.info('Webhook added for repo', { repo: repo, result: res });
-    });
+    callback(null, res);
   });
 };
 

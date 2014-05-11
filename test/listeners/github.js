@@ -55,12 +55,15 @@ describe('listeners/github', function() {
     });
   });
 
-  describe('setupRepoHooks', function(done) {
-    it('ignores repos in config', function() {
+  describe('setupRepoHook', function(done) {
+    it('ignores repo in config', function() {
       var webhookSpy = sinon.spy();
       sinon.stub(test.github, 'createWebhook', webhookSpy);
 
-      test.github.setupRepoHooks(test.config.repos);
+      test.github.setupRepoHook(test.config.repos[0], function(err, res) {
+        expect(err).to.be.ok;
+        expect(res).to.be.null;
+      });
 
       expect(webhookSpy).to.not.have.been.called;
     });
@@ -69,7 +72,7 @@ describe('listeners/github', function() {
       var webhookSpy = sinon.spy();
       sinon.stub(test.github, 'createWebhook', webhookSpy);
 
-      test.github.setupRepoHooks(['new_repo']);
+      test.github.setupRepoHook('new_repo');
 
       expect(webhookSpy).to.have.been.calledOnce;
       expect(webhookSpy).to.have.been.calledWith('new_repo');
