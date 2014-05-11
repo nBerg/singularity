@@ -28,6 +28,20 @@ describe('libraries/singularity', function() {
     done();
   });
 
+  describe('getDomain', function() {
+    it('builds default domain correctly', function() {
+      var app = new Singularity({});
+
+      expect(app.getDomain()).to.equal('localhost:80');
+    });
+
+    it('can take host & endpoint overrides', function() {
+      var app = new Singularity({ host: 'blah', port: '8889' });
+
+      expect(app.getDomain()).to.equal('blah:8889');
+    });
+  });
+
   describe('getConfig', function(done) {
     it('sets defaults correctly', function() {
       checkSparseConfig(new Singularity({}).getConfig());
@@ -125,7 +139,7 @@ describe('libraries/singularity', function() {
       var args = { repo: 'new_test_repo', project: 'new_test_project' };
 
       expect(self.app.addRepoPRJob(args)).to.be.true;
-      expect(self.logSpy).to.have.been.calledWithExactly('config updated', self.app.config);
+      expect(self.logSpy).to.have.been.called;
       expect(self.emitSpy).to.have.been.calledWith('jenkins.new_pr_job');
       expect(self.emitSpy).to.have.been.calledWithExactly('github.new_repo', 'new_test_repo');
     });

@@ -142,13 +142,13 @@ module.exports = function(config) {
       repo: params.repo,
       token: params.token || false
     });
-    app.log.info('config updated', app.config);
+    app.log.info('Singularity: config updated');
 
     return true;
   };
 
   app.getDomain = function() {
-    return (config.host || 'localhost') + ':' + config.port;
+    return (config.host || 'localhost') + ':' + (config.port || '80');
   };
 
   return app;
