@@ -405,6 +405,11 @@ Jenkins.prototype.checkPushJob = function(push) {
       job = push.job,
       project = this.config.push_projects[push.repo];
 
+  if (!project) {
+    self.application.log.error('No push project found for repo', { repo: push.repo });
+    return;
+  }
+
   self.getBuildById(project.name, job.id, function(err, build) {
     if (err || !build) {
       return;
