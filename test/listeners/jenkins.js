@@ -17,16 +17,17 @@ describe('listeners/jenkins', function() {
     test.app = new Emitter();
     test.app.log = new Logger('debug');
     test.generator = {v1: function() { return 'test-id'; }};
+    test.push_project = {
+      repo: 'test_repo',
+      name: 'test_project',
+      token: 'test_token'
+    },
     test.config = {
       protocol: 'http',
       host: 'myjenkins.host.com',
       token: 'global_test_token',
       push_projects: [
-        {
-          repo: 'test_repo',
-          name: 'test_project',
-          token: 'test_token'
-        }
+        test.push_project
       ]
     };
     test.jenkins = Jenkins.init(test.config, test.app, test.generator);
@@ -58,9 +59,16 @@ describe('listeners/jenkins', function() {
     });
   });
 
+  describe('findPushProjectForRepo', function() {
+    it('finds projects woo', function() {
+      expect(test.jenkins.findPushProjectForRepo('test_repo')).to.equal(test.push_project);
+    });
+  });
+
   describe('buildPush', function() {
     it('triggers builds with expected params', function() {
       var triggerSpy = sinon.spy(),
+          pushProjectSearchSpy = sinon.stub(test.jenkins, 'findPushProjectForRepo'),
           expected_opts = {
             token: 'test_token',
             cause: 'test_ref updated to after_sha',
@@ -70,6 +78,7 @@ describe('listeners/jenkins', function() {
             JOB: 'test-id'
           };
 
+      pushProjectSearchSpy.returns(test.push_project);
       sinon.stub(test.jenkins, 'triggerBuild', triggerSpy);
 
       test.jenkins.buildPush(test.mockPush, 'test_branch');
@@ -94,6 +103,19 @@ describe('listeners/jenkins', function() {
   });
 
   describe('checkPushJob', function() {
+    var unit = this;
+
+    beforeEach(function(done) {
+      unit.pushProjectSearchSpy = sinon.stub(test.jenkins, 'findPushProjectForRepo');
+      unit.pushProjectSearchSpy.returns(test.push_project);
+      done();
+    });
+
+    afterEach(function(done) {
+      unit.pushProjectSearchSpy.restore();
+      done();
+    });
+
     it('returns when no build for push', function() {
       var getBuildSpy = sinon.spy();
 
