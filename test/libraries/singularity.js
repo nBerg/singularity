@@ -57,7 +57,11 @@ describe('libraries/singularity', function() {
           name: 'test_job'
         }
       };
-      var config = new Singularity(test.config).getConfig();
+      var instanceCfg = test.config;
+
+      instanceCfg.persist_config = false;
+
+      var config = new Singularity(instanceCfg).getConfig();
 
       expect(config).to.have.keys(['github', 'jenkins']);
       expect(config.github).to.have.keys(['ci_user', 'repositories']);
