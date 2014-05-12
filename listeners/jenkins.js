@@ -304,8 +304,11 @@ Jenkins.prototype.buildPush = function(push, branch) {
   var self = this,
       repo = push.repository.name,
       job_id = self.uuid.v1(),
+      project = this.config.push_projects.filter(function(project) {
+        return project.repo === repo;
+      }).pop(),
       url_opts = {
-        token: self.config.push_projects[repo].token || self.config.token,
+        token: project.token || self.config.token,
         cause: push.ref + ' updated to ' + push.after,
         BRANCH_NAME: branch,
         BEFORE: push.before,
@@ -313,7 +316,7 @@ Jenkins.prototype.buildPush = function(push, branch) {
         JOB: job_id
       };
 
-  self.triggerBuild(self.config.push_projects[repo].name, url_opts, function(error) {
+  self.triggerBuild(project.name, url_opts, function(error) {
     if (error) {
       self.application.log.error(error);
     }

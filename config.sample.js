@@ -42,7 +42,7 @@ exports.config = {
       token: 'project_trigger_token_for_all_projects',
       push_projects: [
         {
-          repo: 'your_repo'
+          repo: 'your_repo',
           rules: [ new RegExp(/^master$/) ],
           name: 'jenkins_project_to_trigger_on_push',
           token: 'project_trigger_token_just_for_this_project'

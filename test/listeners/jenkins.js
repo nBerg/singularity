@@ -21,12 +21,13 @@ describe('listeners/jenkins', function() {
       protocol: 'http',
       host: 'myjenkins.host.com',
       token: 'global_test_token',
-      push_projects: {
-        test_repo: {
+      push_projects: [
+        {
+          repo: 'test_repo',
           name: 'test_project',
           token: 'test_token'
         }
-      }
+      ]
     };
     test.jenkins = Jenkins.init(test.config, test.app, test.generator);
     test.mockPush = {
