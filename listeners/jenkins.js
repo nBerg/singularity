@@ -230,6 +230,7 @@ Jenkins.prototype.pullFound = function(pull) {
  */
 Jenkins.prototype.validatePush = function(push) {
   var repo = push.repository.name,
+      project = this.findPushProjectForRepo(repo),
       log_info = { repo: repo, reference: push.ref, head: push.after };
 
   if (!this.config.push_projects) {
@@ -237,17 +238,28 @@ Jenkins.prototype.validatePush = function(push) {
     return false;
   }
 
-  if (!(repo in this.config.push_projects)) {
+  if (!project) {
     this.application.log.debug('repo not configured for push events', log_info);
     return false;
   }
 
-  if (!this.config.push_projects[repo].name) {
+  if (!project.name) {
     this.application.log.error('No jenkins project given for repo', log_info);
     return false;
   }
 
   return true;
+};
+
+/**
+ * @method findPushProjectForRepo
+ * @param repo {String}
+ */
+Jenkins.prototype.findPushProjectForRepo = function(repo) {
+  return this.config.push_projects.filter(function(project) {
+    return project.repo === repo;
+  })
+  .pop();
 };
 
 /**
@@ -304,9 +316,7 @@ Jenkins.prototype.buildPush = function(push, branch) {
   var self = this,
       repo = push.repository.name,
       job_id = self.uuid.v1(),
-      project = this.config.push_projects.filter(function(project) {
-        return project.repo === repo;
-      }).pop(),
+      project = this.findPushProjectForRepo(repo),
       url_opts = {
         token: project.token || self.config.token,
         cause: push.ref + ' updated to ' + push.after,
@@ -406,9 +416,7 @@ Jenkins.prototype.checkPRJob = function(pull) {
 Jenkins.prototype.checkPushJob = function(push) {
   var self = this,
       job = push.job,
-      project = this.config.push_projects.filter(function(project) {
-        return project.repo === push.repo;
-      }).pop();
+      project = this.findPushProjectForRepo(push.repo);
 
   if (!project) {
     self.application.log.error('No push project found for repo', { repo: push.repo });
