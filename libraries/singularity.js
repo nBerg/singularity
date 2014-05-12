@@ -52,7 +52,14 @@ module.exports = function(config) {
         }
 
         if (Object.keys(storedConfig).length === 0) {
-          app.log.err('Singularity: stored config is empty, continuing to use file', err);
+          app.db.saveSingularityConfig(config, function(err, res) {
+            if (err) {
+              app.log.error('initial config db write failed', err);
+              process.exit(1);
+            }
+
+            app.log.error('stored config is empty; using file, storing config');
+          });
           return;
         }
 
