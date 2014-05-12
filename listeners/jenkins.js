@@ -230,13 +230,14 @@ Jenkins.prototype.pullFound = function(pull) {
  */
 Jenkins.prototype.validatePush = function(push) {
   var repo = push.repository.name,
-      project = this.findPushProjectForRepo(repo),
       log_info = { repo: repo, reference: push.ref, head: push.after };
 
   if (!this.config.push_projects) {
     this.application.log.debug('No push_projects config for jenkins plugin', log_info);
     return false;
   }
+
+  var project = this.findPushProjectForRepo(repo);
 
   if (!project) {
     this.application.log.debug('repo not configured for push events', log_info);
