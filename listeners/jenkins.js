@@ -276,7 +276,7 @@ Jenkins.prototype.pushFound = function(push) {
 
   var self = this,
       repo = push.repository.name,
-      project_config = self.config.push_projects[repo],
+      project_config = self.findPushProjectForRepo(repo),
       log_info = { repo: repo, reference: push.ref, head: push.after },
       branch = push.ref.split('/').pop();
 
