@@ -51,7 +51,7 @@ module.exports = function(config) {
           return;
         }
 
-        if (Object.keys(storedConfig).length === 0) {
+        if (!storedConfig || Object.keys(storedConfig).length === 0) {
           app.db.saveSingularityConfig(config, function(err, res) {
             if (err) {
               app.log.error('initial config db write failed', err);
