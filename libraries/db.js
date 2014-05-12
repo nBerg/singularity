@@ -19,6 +19,16 @@ exports.init = function(config, log) {
       }
       log.info('db.pulls: ensured indices', { indices: res });
     });
+
+    this.connection.createCollection('configuration', { capped: true, max: 1 });
+  };
+
+  MongoDB.prototype.saveSingularityConfig = function(config, callback) {
+    this.connection.configuration.insert(config, callback);
+  };
+
+  MongoDB.prototype.getSingularityConfig = function(callback) {
+    this.connection.configuration.findOne({}, callback);
   };
 
   MongoDB.prototype.insertMerge = function(merge, callback) {

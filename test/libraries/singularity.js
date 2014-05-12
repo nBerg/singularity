@@ -25,6 +25,8 @@ describe('libraries/singularity', function() {
 
   beforeEach(function(done) {
     test.config = require('../../config.sample.js').config;
+    // don't want to test the db...
+    test.config.db = null;
     done();
   });
 

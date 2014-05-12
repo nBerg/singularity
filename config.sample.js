@@ -6,6 +6,9 @@ exports.config = {
   port: '8080',
   // info or debug
   log_level: 'debug',
+  // whether to save this configuration into the database
+  // and opt to use stored configs over this file
+  persist_config: true,
   db: {
     type: 'mongo',
     auth: {

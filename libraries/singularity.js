@@ -1,4 +1,5 @@
 var Logger = require('./log'),
+    Db = require('./db'),
     fs = require('fs'),
     path = require('path'),
     express = require('express');
@@ -6,7 +7,7 @@ var Logger = require('./log'),
 module.exports = function(config) {
 
   var app = express(),
-      standizeConfig = function(config) {
+      standardizeConfig = function(config) {
         if (!config.plugins) {
           config.plugins = {};
         }
@@ -34,9 +35,32 @@ module.exports = function(config) {
         return config;
       };
 
-  app.config = standizeConfig(config || {});
+  app.config = standardizeConfig(config || {});
   app.log = new Logger(config.log_level || 'debug');
+  app.db = Db.init(config.db, app.log);
   app.listeners = [];
+
+  if (config.persist_config) {
+    if (!app.db) {
+      app.log.error('"persist_config" option on, but no DB connection');
+    }
+    else {
+      app.db.getSingularityConfig(function(err, storedConfig) {
+        if (err) {
+          app.log.err('Singularity: could not get db config, continuing to use file', err);
+          return;
+        }
+
+        if (Object.keys(storedConfig).length === 0) {
+          app.log.err('Singularity: stored config is empty, continuing to use file', err);
+          return;
+        }
+
+        app.config = storedConfig;
+        app.log.info('Singularity: Using stored application configuration');
+      });
+    }
+  }
 
   app.loadListeners = function(directories) {
     if (!Array.isArray(directories)) {
@@ -142,7 +166,7 @@ module.exports = function(config) {
       repo: params.repo,
       token: params.token || false
     });
-    app.log.info('Singularity: config updated');
+    app.log.info('Singularity: runtime config updated');
 
     return true;
   };
@@ -150,6 +174,22 @@ module.exports = function(config) {
   app.getDomain = function() {
     return (config.host || 'localhost') + ':' + (config.port || '80');
   };
+
+  app.on('singularity.configuration.updated', function(plugin) {
+    if (!app.config.persist_config) {
+      app.log.info('not persisting config changes', { requesting_plugin: plugin });
+    }
+
+    app.db.saveSingularityConfiguration(config, function(err, res) {
+      if (err) {
+        app.log.error('error saving runtime configuration, exiting!', { error: err });
+        process.exit(1);
+      }
+
+      app.log.info('Singularity: saved config into DB', { notifying_plugin: plugin });
+      app.log.debug('Singularity Config Save result', { result: res });
+    });
+  });
 
   return app;
 };
