@@ -20,7 +20,7 @@ exports.init = function(config, log) {
       log.info('db.pulls: ensured indices', { indices: res });
     });
 
-    this.connection.createCollection('config', { size:1, capped: true, max: 1 });
+    this.connection.createCollection('config');
   };
 
   MongoDB.prototype.saveSingularityConfig = function(config, callback) {
