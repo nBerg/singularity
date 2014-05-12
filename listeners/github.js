@@ -38,8 +38,10 @@ var GitHub = function(config, application, events) {
         return;
       }
 
+      // yay for references - directly updates in application config :|
       self.config.repos.push(repo);
       self.application.log.info('Github Listener: updated config & hook', { repo: repo, api_res: res });
+      self.application.emit('singularity.configuration.updated', 'github');
     });
   });
 

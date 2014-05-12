@@ -24,8 +24,10 @@ var Jenkins = function(config, application, idGen, requester) {
   self.application = application;
 
   self.application.on('jenkins.new_pr_job', function(job) {
+    // yay for references - directly updates in application config :|
     self.config.projects.push(job);
     self.application.log.info('jenkins: updated config');
+    self.application.emit('singularity.configuration.updated', 'jenkins');
   });
 
   self.application.on('push.found', function(push) {
