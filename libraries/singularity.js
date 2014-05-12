@@ -209,7 +209,6 @@ module.exports = function(config, log) {
       }
 
       app.log.info('Singularity: saved config into DB', { notifying_plugin: plugin });
-      app.log.debug('Singularity Config Save result', { result: res });
     });
   });
 
