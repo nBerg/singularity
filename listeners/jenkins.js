@@ -403,7 +403,9 @@ Jenkins.prototype.checkPRJob = function(pull) {
 Jenkins.prototype.checkPushJob = function(push) {
   var self = this,
       job = push.job,
-      project = this.config.push_projects[push.repo];
+      project = this.config.push_projects.filter(function(project) {
+        return project.repo === push.repo;
+      }).pop();
 
   if (!project) {
     self.application.log.error('No push project found for repo', { repo: push.repo });

@@ -40,15 +40,14 @@ exports.config = {
       protocol: 'http',
       host: 'YOUR_JENKINS_HOST',
       token: 'project_trigger_token_for_all_projects',
-      push_projects: {
-        'your_repo': {
-          // refs
+      push_projects: [
+        {
+          repo: 'your_repo'
           rules: [ new RegExp(/^master$/) ],
           name: 'jenkins_project_to_trigger_on_push',
           token: 'project_trigger_token_just_for_this_project'
         }
-      },
-      // todo: enforce using a hash
+      ],
       projects: [
         {
           name: 'project_name',
