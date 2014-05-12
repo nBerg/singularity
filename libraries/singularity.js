@@ -202,7 +202,7 @@ module.exports = function(config, log) {
       app.log.info('not persisting config changes', { requesting_plugin: plugin });
     }
 
-    app.db.saveSingularityConfiguration(config, function(err, res) {
+    app.db.saveSingularityConfig(config, function(err, res) {
       if (err) {
         app.log.error('error saving runtime configuration, exiting!', { error: err });
         process.exit(1);
