@@ -4,7 +4,7 @@ var Logger = require('./log'),
     path = require('path'),
     express = require('express');
 
-module.exports = function(config) {
+module.exports = function(config, log) {
 
   var app = express(),
       standardizeConfig = function(config) {
@@ -36,38 +36,53 @@ module.exports = function(config) {
       };
 
   app.config = standardizeConfig(config || {});
-  app.log = new Logger(config.log_level || 'debug');
+  app.log = log || new Logger(config.log_level || 'debug');
   app.db = Db.init(config.db, app.log);
   app.listeners = [];
 
-  if (config.persist_config) {
+  app.attemptDbConfigLoad = function() {
     if (!app.db) {
-      app.log.error('"persist_config" option on, but no DB connection');
+      app.log.info('no db connection, loading config from file');
+      return;
     }
-    else {
+
+    if (!app.config.persist_config) {
+      app.log.info('warning: "persist_config" option is off; config will always be loaded from file');
       app.db.getSingularityConfig(function(err, storedConfig) {
         if (err) {
-          app.log.err('Singularity: could not get db config, continuing to use file', err);
           return;
         }
 
-        if (!storedConfig || Object.keys(storedConfig).length === 0) {
-          app.db.saveSingularityConfig(config, function(err, res) {
-            if (err) {
-              app.log.error('initial config db write failed', err);
-              process.exit(1);
-            }
-
-            app.log.error('stored config is empty; using file, storing config');
-          });
-          return;
+        if (storedConfig && Object.keys(storedConfig).length > 0) {
+          app.log.info('Found a configuration in the DB! "persist_config" must be true to load it; Using file');
         }
-
-        app.config = storedConfig;
-        app.log.info('Singularity: Using stored application configuration');
       });
+
+      return;
     }
-  }
+
+    app.db.getSingularityConfig(function(err, storedConfig) {
+      if (err) {
+        app.log.error('Singularity: could not get db config, continuing to use file', err);
+        return;
+      }
+
+      if (!storedConfig || Object.keys(storedConfig).length === 0) {
+        app.db.saveSingularityConfig(config, function(err, res) {
+          if (err) {
+            app.log.error('initial config db write failed', err);
+            process.exit(1);
+          }
+
+          app.log.error('stored config is empty; using file, storing config');
+        });
+        return;
+      }
+
+      app.config = storedConfig;
+      app.log.info('Singularity: Using stored application configuration');
+    });
+  };
 
   app.loadListeners = function(directories) {
     if (!Array.isArray(directories)) {
