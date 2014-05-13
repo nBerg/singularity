@@ -33,9 +33,9 @@ var GitHub = function(config, application, events) {
 
   self.application.on('github.new_repo', function(repo) {
     self.setupRepoHook(repo, function(err, res) {
+      // log error but still store repo - no harm & makes it easier to sync up configs between plugins
       if (err) {
         self.application.log.error(err, res);
-        return;
       }
 
       // yay for references - directly updates in application config :|
