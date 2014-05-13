@@ -1,14 +1,13 @@
-Singularity [![Build Status](https://travis-ci.org/behance/singularity.svg?branch=master)](https://travis-ci.org/behance/singularity)
+Singularity
 ===========
 
 **All your github payloads are belong to us.**
 
 A refactored form of SnapInteractive's [Mergeatron](https://github.com/SnapInteractive/mergeatron), sitting behind an [express.js](https://github.com/visionmedia/express) application (v4.x).
 
-We use TravisCI for this repo because **our** instance of mergeatron is behind a VPC/firewall, so no pretty badge or link to test console for master ;)
-
 ###Main differences:
 
+- persistence of configs in mongo
 - data schema has a few additions
 - MongoDB is the only supported DB layer (sorry - until I figure out a way to simulate a DB abstraction interface)
 - plugins are split out into `listeners` and that's all they do. The github plugin does not contain a simple http server anymore, events are emitted to it from the application.
@@ -20,7 +19,6 @@ We use TravisCI for this repo because **our** instance of mergeatron is behind a
 
 ###To Come:
 
-- persistence of configs in mongo, or writing updates to the file...or both.
 - support for multiple organizations
 - better module structuring
 - proper routing / yavascripts (because I'm not a JS dev)
