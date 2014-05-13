@@ -96,7 +96,7 @@ module.exports = function(config, log) {
           process.exit(1);
         }
 
-        if (!config.plugins) {
+        if (!app.config.plugins) {
           app.log.info('No plugin configurations found - skipping');
           return;
         }
@@ -109,16 +109,16 @@ module.exports = function(config, log) {
             continue;
           }
 
-          if (!config.plugins[pluginName]) {
+          if (!app.config.plugins[pluginName]) {
             app.log.info('No configuration for ' + pluginName + ', not loading');
             continue;
           }
 
-          var pluginEnabled = config.plugins[pluginName].enabled;
+          var pluginEnabled = app.config.plugins[pluginName].enabled;
 
           if (pluginEnabled === undefined || pluginEnabled) {
             app.log.info('Loading plugin: ' + pluginName);
-            app.listeners.push(require(filename).init(config.plugins[pluginName], app).start());
+            app.listeners.push(require(filename).init(app.config.plugins[pluginName], app).start());
           }
           else {
             app.log.info('Not loading disabled plugin ' + pluginName);
@@ -193,7 +193,7 @@ module.exports = function(config, log) {
   };
 
   app.getDomain = function() {
-    return (config.host || 'localhost') + ':' + (config.port || '80');
+    return (app.config.host || 'localhost') + ':' + (app.config.port || '80');
   };
 
   app.on('singularity.configuration.updated', function(plugin) {
@@ -201,7 +201,7 @@ module.exports = function(config, log) {
       app.log.info('not persisting config changes', { requesting_plugin: plugin });
     }
 
-    app.db.saveSingularityConfig(config, function(err, res) {
+    app.db.saveSingularityConfig(app.config, function(err, res) {
       if (err) {
         app.log.error('error saving runtime configuration, exiting!', { error: err });
         process.exit(1);
