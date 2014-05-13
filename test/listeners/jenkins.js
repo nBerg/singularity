@@ -1,4 +1,5 @@
-var sinon = require('sinon'),
+var Logger = require('../../libraries/log'),
+    sinon = require('sinon'),
     assert = require('assert'),
     chai = require('chai'),
     expect = chai.expect,
@@ -14,17 +15,20 @@ describe('listeners/jenkins', function() {
   beforeEach(function(done) {
     test.events = new Emitter();
     test.app = new Emitter();
+    test.app.log = new Logger('debug');
     test.generator = {v1: function() { return 'test-id'; }};
+    test.push_project = {
+      repo: 'test_repo',
+      name: 'test_project',
+      token: 'test_token'
+    },
     test.config = {
       protocol: 'http',
       host: 'myjenkins.host.com',
       token: 'global_test_token',
-      push_projects: {
-        test_repo: {
-          name: 'test_project',
-          token: 'test_token'
-        }
-      }
+      push_projects: [
+        test.push_project
+      ]
     };
     test.jenkins = Jenkins.init(test.config, test.app, test.generator);
     test.mockPush = {
@@ -37,9 +41,34 @@ describe('listeners/jenkins', function() {
     done();
   });
 
+  describe('start', function() {
+    it('it does not when there is no db connection', function() {
+      var prJobSpy = sinon.spy(),
+          pushJobSpy = sinon.spy(),
+          logSpy = sinon.spy();
+
+      sinon.stub(test.jenkins, 'checkPRJob', prJobSpy);
+      sinon.stub(test.jenkins, 'checkPushJob', pushJobSpy);
+      sinon.stub(test.app.log, 'error', logSpy);
+
+      test.jenkins.start();
+
+      expect(logSpy).to.have.been.calledOnce;
+      expect(prJobSpy).to.not.have.been.called;
+      expect(pushJobSpy).to.not.have.been.called;
+    });
+  });
+
+  describe('findPushProjectForRepo', function() {
+    it('finds projects woo', function() {
+      expect(test.jenkins.findPushProjectForRepo('test_repo')).to.equal(test.push_project);
+    });
+  });
+
   describe('buildPush', function() {
     it('triggers builds with expected params', function() {
       var triggerSpy = sinon.spy(),
+          pushProjectSearchStub = sinon.stub(test.jenkins, 'findPushProjectForRepo'),
           expected_opts = {
             token: 'test_token',
             cause: 'test_ref updated to after_sha',
@@ -49,6 +78,7 @@ describe('listeners/jenkins', function() {
             JOB: 'test-id'
           };
 
+      pushProjectSearchStub.returns(test.push_project);
       sinon.stub(test.jenkins, 'triggerBuild', triggerSpy);
 
       test.jenkins.buildPush(test.mockPush, 'test_branch');
@@ -62,9 +92,9 @@ describe('listeners/jenkins', function() {
       var jenkinsBuilds = require('../fixtures/jenkins_builds.json'),
           requestStub = function(opt, cb) {
             cb(null, jenkinsBuilds);
-          };
-      test.jenkins = Jenkins.init(test.config, test.app, test.generator, requestStub);
-      test.jenkins.getJobBuilds('should_not_matter', function(err, builds) {
+          },
+          instance = Jenkins.init(test.config, test.app, test.generator, requestStub);
+      instance.getJobBuilds('should_not_matter', function(err, builds) {
         expect(builds.length).to.be.equal(1);
         expect(builds[0].parameters).to.be.an('Array');
         expect(builds[0].url).to.contain('consoleFull');
@@ -72,7 +102,80 @@ describe('listeners/jenkins', function() {
     });
   });
 
+  describe('validatePush', function() {
+    var unit = this;
+
+    beforeEach(function(done) {
+      unit.pushProjectSearchStub = sinon.stub(test.jenkins, 'findPushProjectForRepo');
+      done();
+    });
+
+    afterEach(function(done) {
+      unit.pushProjectSearchStub.restore();
+      done();
+    });
+
+    it('false when no config', function() {
+      var instance = Jenkins.init({}, test.app),
+          logSpy = sinon.spy();
+
+      sinon.stub(test.app.log, 'debug', logSpy);
+
+      expect(instance.validatePush(test.mockPush)).to.be.false;
+      expect(logSpy).to.have.been.called;
+    });
+
+    it('false when no project', function() {
+      var instance = Jenkins.init({ push_projects: [] }, test.app),
+          logSpy = sinon.spy();
+
+      unit.pushProjectSearchStub.returns(null);
+      sinon.stub(test.app.log, 'debug', logSpy);
+
+      expect(instance.validatePush(test.mockPush)).to.be.false;
+      expect(logSpy).to.have.been.called;
+    });
+
+    it('false when no project name', function() {
+      var instance = Jenkins.init({ push_projects: [{ repo: 'test_repo' }] }, test.app),
+          logSpy = sinon.spy();
+
+      unit.pushProjectSearchStub.returns({});
+      sinon.stub(test.app.log, 'error', logSpy);
+
+      expect(instance.validatePush(test.mockPush)).to.be.false;
+      expect(logSpy).to.have.been.called;
+    });
+
+    it('returns true when valid', function() {
+      var instance = Jenkins.init({ push_projects: [test.push_project] }, test.app),
+          errorSpy = sinon.spy(),
+          debugSpy = sinon.spy();
+
+      unit.pushProjectSearchStub.returns(test.push_project);
+      sinon.stub(test.app.log, 'error', errorSpy);
+      sinon.stub(test.app.log, 'debug', debugSpy);
+
+      expect(instance.validatePush(test.mockPush)).to.be.true;
+      expect(errorSpy).to.not.have.been.called;
+      expect(debugSpy).to.not.have.been.called;
+    });
+  });
+
   describe('checkPushJob', function() {
+    var unit = this;
+
+    beforeEach(function(done) {
+      unit.pushProjectSearchStub = sinon.stub(test.jenkins, 'findPushProjectForRepo');
+      unit.pushProjectSearchStub.returns(test.push_project);
+      done();
+    });
+
+    afterEach(function(done) {
+      unit.pushProjectSearchStub.restore();
+      done();
+    });
+
     it('returns when no build for push', function() {
       var getBuildSpy = sinon.spy();
 

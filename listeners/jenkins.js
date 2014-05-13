@@ -23,9 +23,11 @@ var Jenkins = function(config, application, idGen, requester) {
   self.config = config;
   self.application = application;
 
-  self.application.on('singularity.jenkins.config_updated', function(config) {
+  self.application.on('jenkins.new_pr_job', function(job) {
+    // yay for references - directly updates in application config :|
+    self.config.projects.push(job);
     self.application.log.info('jenkins: updated config');
-    self.config = config;
+    self.application.emit('singularity.configuration.updated', 'jenkins');
   });
 
   self.application.on('push.found', function(push) {
@@ -96,6 +98,11 @@ Jenkins.prototype.findProjectByRepo = function(repo) {
  * @method start
  */
 Jenkins.prototype.start = function() {
+  if (!this.application.db) {
+    this.application.log.error('Jenkins Listener: missing app db... (╯°□°）╯︵ ┻━┻');
+    return this;
+  }
+
   var self = this;
   async.parallel({
     jenkins: function() {
@@ -230,17 +237,30 @@ Jenkins.prototype.validatePush = function(push) {
     return false;
   }
 
-  if (!(repo in this.config.push_projects)) {
+  var project = this.findPushProjectForRepo(repo);
+
+  if (!project) {
     this.application.log.debug('repo not configured for push events', log_info);
     return false;
   }
 
-  if (!this.config.push_projects[repo].name) {
+  if (!project.name) {
     this.application.log.error('No jenkins project given for repo', log_info);
     return false;
   }
 
   return true;
+};
+
+/**
+ * @method findPushProjectForRepo
+ * @param repo {String}
+ */
+Jenkins.prototype.findPushProjectForRepo = function(repo) {
+  return this.config.push_projects.filter(function(project) {
+    return project.repo === repo;
+  })
+  .pop();
 };
 
 /**
@@ -257,7 +277,7 @@ Jenkins.prototype.pushFound = function(push) {
 
   var self = this,
       repo = push.repository.name,
-      project_config = self.config.push_projects[repo],
+      project_config = self.findPushProjectForRepo(repo),
       log_info = { repo: repo, reference: push.ref, head: push.after },
       branch = push.ref.split('/').pop();
 
@@ -297,8 +317,9 @@ Jenkins.prototype.buildPush = function(push, branch) {
   var self = this,
       repo = push.repository.name,
       job_id = self.uuid.v1(),
+      project = this.findPushProjectForRepo(repo),
       url_opts = {
-        token: self.config.push_projects[repo].token || self.config.token,
+        token: project.token || self.config.token,
         cause: push.ref + ' updated to ' + push.after,
         BRANCH_NAME: branch,
         BEFORE: push.before,
@@ -306,7 +327,7 @@ Jenkins.prototype.buildPush = function(push, branch) {
         JOB: job_id
       };
 
-  self.triggerBuild(self.config.push_projects[repo].name, url_opts, function(error) {
+  self.triggerBuild(project.name, url_opts, function(error) {
     if (error) {
       self.application.log.error(error);
     }
@@ -396,7 +417,12 @@ Jenkins.prototype.checkPRJob = function(pull) {
 Jenkins.prototype.checkPushJob = function(push) {
   var self = this,
       job = push.job,
-      project = this.config.push_projects[push.repo];
+      project = this.findPushProjectForRepo(push.repo);
+
+  if (!project) {
+    self.application.log.error('No push project found for repo', { repo: push.repo });
+    return;
+  }
 
   self.getBuildById(project.name, job.id, function(err, build) {
     if (err || !build) {

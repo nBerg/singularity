@@ -24,6 +24,7 @@
     "require": false,
     "define": false,
     "beforeEach": false,
+    "afterEach": false,
     "describe": false,
     "it": false
   },

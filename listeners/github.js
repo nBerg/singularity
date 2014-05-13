@@ -31,9 +31,18 @@ var GitHub = function(config, application, events) {
 
   self.api.authenticate(config.auth);
 
-  self.application.on('singularity.github.config_updated', function(config) {
-    self.application.log.info('github: updated config');
-    self.config = config;
+  self.application.on('github.new_repo', function(repo) {
+    self.setupRepoHook(repo, function(err, res) {
+      if (err) {
+        self.application.log.error(err, res);
+        return;
+      }
+
+      // yay for references - directly updates in application config :|
+      self.config.repos.push(repo);
+      self.application.log.info('Github Listener: updated config & hook', { repo: repo, api_res: res });
+      self.application.emit('singularity.configuration.updated', 'github');
+    });
   });
 
   self.application.on('pull.validated', function(pull) {
@@ -88,6 +97,11 @@ var GitHub = function(config, application, events) {
  * @method start
  */
 GitHub.prototype.start = function() {
+  if (!this.application.db) {
+    this.application.log.error('Github Listener: missing app db... (╯°□°）╯︵ ┻━┻');
+    return this;
+  }
+
   if (this.config.method === 'hooks') {
     this.checkRepos();
   }
@@ -500,6 +514,60 @@ GitHub.prototype.handlePush = function(payload) {
       self.application.emit('push.found', payload);
     });
   });
+};
+
+/**
+ * Create / configure webhooks for a given list of repos
+ *
+ * @method setupRepoHook
+ * @param repos {Array}
+ */
+GitHub.prototype.setupRepoHook = function(repo, callback) {
+  var self = this;
+
+  if (self.config.repos.indexOf(repo) !== -1) {
+    callback('repo already configured', null);
+    return;
+  }
+
+  self.createWebhook(repo, function(err, res) {
+    if (err) {
+      callback('Failed to create webhook', { repo: repo, error: err });
+      return;
+    }
+
+    callback(null, res);
+  });
+};
+
+/**
+ * Create webhook for a given repo
+ *
+ * @method createWebhook
+ * @param repo {String}
+ */
+GitHub.prototype.createWebhook = function(repo, callback) {
+  var self = this;
+
+  self.api.repos.createHook({
+      user: self.config.user,
+      repo: repo,
+      name: 'web',
+      active: true,
+      events: [
+        'pull_request',
+        'issue_comment',
+        'push'
+      ],
+      config: {
+        url: self.application.getDomain(),
+        content_type: 'json'
+      }
+    },
+    function(err, res) {
+      callback(err, res);
+    }
+  );
 };
 
 /**

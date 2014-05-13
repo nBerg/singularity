@@ -2,12 +2,10 @@
 
 var config = require('./config').config,
     Singularity = require('./libraries/singularity'),
-    Db = require('./libraries/db'),
     app = Singularity(config);
 
-app.db = Db.init(config.db, app.log);
-
 app.loadListeners([__dirname + '/listeners']);
+app.attemptDbConfigLoad();
 
 // ROUTES
 app.post('/', function(request, response) {

@@ -24,13 +24,35 @@ describe('libraries/singularity', function() {
       };
 
   beforeEach(function(done) {
+    test.log = {
+      error: function() {},
+      debug: function() {},
+      info: function() {}
+    };
+
     test.config = require('../../config.sample.js').config;
+    // don't want to test the db...
+    test.config.db = null;
     done();
+  });
+
+  describe('getDomain', function() {
+    it('builds default domain correctly', function() {
+      var app = new Singularity({}, test.log);
+
+      expect(app.getDomain()).to.equal('localhost:80');
+    });
+
+    it('can take host & endpoint overrides', function() {
+      var app = new Singularity({ host: 'blah', port: '8889' }, test.log);
+
+      expect(app.getDomain()).to.equal('blah:8889');
+    });
   });
 
   describe('getConfig', function(done) {
     it('sets defaults correctly', function() {
-      checkSparseConfig(new Singularity({}).getConfig());
+      checkSparseConfig(new Singularity({}, test.log).getConfig());
     });
 
     it('filters data correctly', function() {
@@ -41,7 +63,11 @@ describe('libraries/singularity', function() {
           name: 'test_job'
         }
       };
-      var config = new Singularity(test.config).getConfig();
+      var instanceCfg = test.config;
+
+      instanceCfg.persist_config = false;
+
+      var config = new Singularity(instanceCfg, test.log).getConfig();
 
       expect(config).to.have.keys(['github', 'jenkins']);
       expect(config.github).to.have.keys(['ci_user', 'repositories']);
@@ -65,6 +91,14 @@ describe('libraries/singularity', function() {
       expect(pushProjectCfg.has_trigger_token).to.be.false;
       expect(pushProjectCfg.repo).to.equal('test_repo');
       expect(pushProjectCfg.name).to.equal('test_job');
+    });
+
+    // a stupid bug where `config` was used instead of `app.config`
+    it('does not reference old config after update', function() {
+      var instance = new Singularity({}, test.log);
+      instance.config.plugins.github.repos.push('new_test_repo');
+
+      expect(instance.getConfig().github.repositories).to.contain('new_test_repo');
     });
   });
 
@@ -91,7 +125,7 @@ describe('libraries/singularity', function() {
         };
 
     beforeEach(function(done) {
-      self.app = new Singularity(config);
+      self.app = new Singularity(config, test.log);
       self.logSpy = sinon.spy(),
       self.emitSpy = sinon.spy();
       sinon.stub(self.app.log, 'info', self.logSpy);
@@ -125,15 +159,70 @@ describe('libraries/singularity', function() {
       var args = { repo: 'new_test_repo', project: 'new_test_project' };
 
       expect(self.app.addRepoPRJob(args)).to.be.true;
-      expect(self.logSpy).to.have.been.calledWithExactly('config updated', self.app.config);
-      expect(self.emitSpy).to.have.been.calledWithExactly('singularity.jenkins.config_updated', self.app.config.plugins.jenkins);
-      expect(self.emitSpy).to.have.been.calledWithExactly('singularity.github.config_updated', self.app.config.plugins.github);
+      expect(self.logSpy).to.have.been.called;
+      expect(self.emitSpy).to.have.been.calledWith('jenkins.new_pr_job');
+      expect(self.emitSpy).to.have.been.calledWithExactly('github.new_repo', 'new_test_repo');
+    });
+  });
 
-      var plugins = self.app.config.plugins,
-          expectedCfg = { repo: 'new_test_repo', name: 'new_test_project', token: false };
+  describe('attemptDbConfigLoad', function() {
+    it('uses passed config when no db connection', function() {
+      var instance = new Singularity({}, test.log);
 
-      expect(plugins.github.repos).to.include('new_test_repo');
-      expect(plugins.jenkins.projects).to.include(expectedCfg);
+      instance.attemptDbConfigLoad();
+      checkSparseConfig(instance.getConfig());
+    });
+
+    it('ignores saved config with persist_config is false', function() {
+      var instance = new Singularity({ persist_config: false }, test.log);
+
+      instance.db = {
+        getSingularityConfig: function(callback) { callback(null, test.config); }
+      };
+
+      instance.attemptDbConfigLoad();
+      checkSparseConfig(instance.getConfig());
+    });
+
+    it('uses passed config when it cannot connect to db', function() {
+      var instance = new Singularity({ persist_config: true }, test.log);
+
+      instance.db = {
+        getSingularityConfig: function(callback) { callback('error!', {}); }
+      };
+
+      instance.attemptDbConfigLoad();
+      checkSparseConfig(instance.getConfig());
+    });
+
+    it('uses passed config when stored db config is empty', function() {
+      var instance = new Singularity({ persist_config: true }, test.log),
+          dbSpy = sinon.spy();
+
+      instance.config.plugins.github.repos.push('test_repo');
+
+      instance.db = {
+        getSingularityConfig: function(callback) { callback(null, {}); },
+        saveSingularityConfig: function(callback) { callback(null, {}); }
+      };
+
+      sinon.stub(instance.db, 'saveSingularityConfig', dbSpy);
+
+      instance.attemptDbConfigLoad();
+      expect(dbSpy).to.have.been.calledWith(instance.config);
+    });
+
+    it('loads config properly from db if able', function() {
+      var instance = new Singularity({ persist_config: true }, test.log),
+          dbConfig = { foo: 'bar' };
+
+      instance.db = {
+        getSingularityConfig: function(callback) { callback(null, dbConfig); }
+      };
+
+      instance.attemptDbConfigLoad();
+
+      expect(instance.config).to.equal(dbConfig);
     });
   });
 });
