@@ -128,14 +128,13 @@ module.exports = function(config, log) {
     });
   };
 
-  // todo: make config schema not crap
   app.getConfig = function() {
-    if (!config.plugins) {
+    if (!app.config || !app.config.plugins) {
       return {};
     }
 
     var selectData = {},
-        configs = config.plugins,
+        configs = app.config.plugins,
         formatProjectCfg = function(projects) {
           if (!projects && !Array.isArray(projects) && !(projects instanceof Object)) {
             return [];

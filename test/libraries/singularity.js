@@ -92,6 +92,14 @@ describe('libraries/singularity', function() {
       expect(pushProjectCfg.repo).to.equal('test_repo');
       expect(pushProjectCfg.name).to.equal('test_job');
     });
+
+    // a stupid bug where `config` was used instead of `app.config`
+    it('does not reference old config after update', function() {
+      var instance = new Singularity({}, test.log);
+      instance.config.plugins.github.repos.push('new_test_repo');
+
+      expect(instance.getConfig().github.repositories).to.contain('new_test_repo');
+    });
   });
 
   describe('addRepoPRJob', function() {
@@ -213,6 +221,7 @@ describe('libraries/singularity', function() {
       };
 
       instance.attemptDbConfigLoad();
+
       expect(instance.config).to.equal(dbConfig);
     });
   });
