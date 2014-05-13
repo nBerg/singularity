@@ -40,9 +40,12 @@ module.exports = function(config, log) {
   app.db = Db.init(config.db, app.log);
   app.listeners = [];
 
-  app.attemptDbConfigLoad = function() {
+  app.attemptDbConfigLoad = function(callback) {
+    callback = callback || function() {};
+
     if (!app.db) {
       app.log.info('no db connection, loading config from file');
+      callback();
       return;
     }
 
@@ -50,6 +53,7 @@ module.exports = function(config, log) {
       app.log.info('warning: "persist_config" option is off; config will always be loaded from file');
       app.db.getSingularityConfig(function(err, storedConfig) {
         if (err) {
+          callback();
           return;
         }
 
@@ -58,12 +62,14 @@ module.exports = function(config, log) {
         }
       });
 
+      callback();
       return;
     }
 
     app.db.getSingularityConfig(function(err, storedConfig) {
       if (err) {
         app.log.error('Singularity: could not get db config, continuing to use file', err);
+        callback();
         return;
       }
 
@@ -76,11 +82,14 @@ module.exports = function(config, log) {
 
           app.log.error('stored config is empty; using file, storing config');
         });
+
+        callback();
         return;
       }
 
       app.config = storedConfig;
       app.log.info('Singularity: Using stored application configuration');
+      callback();
     });
   };
 
