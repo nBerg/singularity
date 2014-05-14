@@ -389,6 +389,7 @@ Jenkins.prototype.checkPRJob = function(pull) {
     if (job.status === 'new') {
       self.application.db.updatePRJobStatus(job.id, 'started', 'BUILDING');
       self.application.emit('build.started', job, pull, build.url);
+      return;
     }
 
     if (job.status === 'finished' || build.building) {
