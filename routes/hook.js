@@ -53,7 +53,14 @@ exports.init = function(app, request, response) {
 
   request.on('end', function() {
     app.log.debug('Received post for event: ' + request.headers['x-github-event']);
-    app.emit(request.headers['x-github-event'], JSON.parse(data));
+
+    try {
+      app.emit(request.headers['x-github-event'], JSON.parse(data));
+    }
+    catch(err) {
+      var error = err.stack ? err.stack : err;
+      app.log.error('Could not parse webhook payload!', { error: error, event: data });
+    }
   });
 
   response.send(200, response_obj);
