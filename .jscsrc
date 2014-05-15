@@ -11,8 +11,9 @@
   "disallowMultipleLineBreaks": true,
   "validateLineBreaks": "LF",
 
-  "requireSpaceBeforeBinaryOperators": ["/", "*", "+", "-", "=", "==", "===", "!=", "!==", ">", ">=", "<", "<="],
-  "requireSpaceAfterBinaryOperators": ["/", "*", "+", "-", "=", "==", "===", "!=", "!==", ">", ">=", "<", "<="],
+  "requireSpaceBeforeBinaryOperators": ["/", "*", "+", "-", "==", "===", "!=", "!==", ">", ">=", "<", "<="],
+  "requireSpaceAfterBinaryOperators": ["/", "*", "+", "-", "==", "===", "!=", "!==", ">", ">=", "<", "<="],
+
   "disallowSpaceAfterPrefixUnaryOperators": ["++", "--", "+", "-", "!", "~"],
   "disallowSpaceBeforePostfixUnaryOperators": ["++", "--"],
   "disallowLeftStickedOperators": ["?"],
