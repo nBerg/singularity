@@ -13,13 +13,13 @@
       "node-uuid": ">=1.3.3",
       "async": ">=0.1.22",
       "winston": ">=0.6.2",
-      "range_check": "*"
+      "range_check": "0.0.4"
   },
   "devDependencies": {
       "grunt-cli": "~0.1.9",
       "grunt": "0.4.2",
-      "grunt-contrib-jshint": "",
-      "grunt-jscs-checker": "",
+      "grunt-contrib-jshint": "~0.10",
+      "grunt-jscs-checker": "0.4.2",
       "grunt-mocha-test": "~0.10.2",
       "mocha": "~1.18.2",
       "chai": "~1.9",
