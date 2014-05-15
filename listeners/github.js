@@ -62,7 +62,7 @@ var GitHub = function(config, application, events) {
   });
 
   self.application.on('build.aborted', function(job, pull, build_url) {
-    self.createStatus(job.head, config.user, pull.repo, 'aborted', build_url, 'Singularity Build Aborted');
+    self.createStatus(job.head, config.user, pull.repo, 'error', build_url, 'Singularity Build Aborted');
   });
 
   self.application.on('pull.inline_status', function(pull, sha, file, position, comment) {
