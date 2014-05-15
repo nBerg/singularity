@@ -197,24 +197,50 @@ describe('listeners/jenkins', function() {
       expect(dbSpy).to.have.been.calledWithExactly(test.mongoPush.job.id, 'started', 'BUILDING');
     });
 
-    it('updates finished build statuses', function() {
+    it('does nothing when job is marked as finished', function() {
+      test.jenkins.application.db = { updatePushJobStatus: function() {} };
+      test.jenkins.application.log = { debug: function() {} };
+
       var getBuildStub = sinon.stub(test.jenkins, 'getBuildById'),
           dbSpy = sinon.spy(),
           logSpy = sinon.spy(),
           emitSpy = sinon.spy(),
           artifactSpy = sinon.spy();
 
-      test.jenkins.application.db = { updatePushJobStatus: function() {} };
-      test.jenkins.application.log = { debug: function() {} };
-      sinon.stub(test.jenkins.application, 'emit', emitSpy);
       sinon.stub(test.jenkins.application.db, 'updatePushJobStatus', dbSpy);
+      sinon.stub(test.jenkins.application, 'emit', emitSpy);
       sinon.stub(test.jenkins.application.log, 'debug', logSpy);
       sinon.stub(test.jenkins, 'processArtifacts', artifactSpy);
+
       getBuildStub.callsArgWith(2, null, { building: false, result: "FAILURE" });
 
       expect(test.jenkins.checkPushJob(test.mongoPush)).to.be.undefined;
-      expect(dbSpy).to.have.been.calledOnce;
-      expect(dbSpy).to.have.been.calledWithExactly(test.mongoPush.job.id, 'finished', 'FAILURE');
+      expect(emitSpy).to.not.have.been.called;
+      expect(dbSpy).to.not.have.been.called;
+      expect(logSpy).to.not.have.been.called;
+      expect(artifactSpy).to.not.have.been.called;
+    });
+
+    it('updates finished build statuses', function() {
+      test.jenkins.application.db = { updatePushJobStatus: function() {} };
+      test.jenkins.application.log = { debug: function() {} };
+
+      var getBuildStub = sinon.stub(test.jenkins, 'getBuildById'),
+          dbStub = sinon.stub(test.jenkins.application.db, 'updatePushJobStatus'),
+          logSpy = sinon.spy(),
+          emitSpy = sinon.spy(),
+          artifactSpy = sinon.spy(),
+          mongoPush = test.mongoPush;
+
+      mongoPush.job.status = 'started';
+      sinon.stub(test.jenkins.application, 'emit', emitSpy);
+      sinon.stub(test.jenkins.application.log, 'debug', logSpy);
+      sinon.stub(test.jenkins, 'processArtifacts', artifactSpy);
+
+      dbStub.callsArgWith(3, null);
+      getBuildStub.callsArgWith(2, null, { building: false, result: "FAILURE" });
+
+      expect(test.jenkins.checkPushJob(mongoPush)).to.be.undefined;
       expect(emitSpy).to.have.been.calledOnce;
       expect(emitSpy).to.have.been.calledWith('push.build.failure');
       expect(logSpy).to.have.been.calledOnce;

@@ -138,12 +138,12 @@ exports.init = function(config, log) {
     }.bind(this));
   };
 
-  MongoDB.prototype.updatePushJobStatus = function(job_id, status, result) {
-    this.connection.pushes.update({ 'job.id': job_id }, { $set: { 'job.status': status, 'job.result': result }});
+  MongoDB.prototype.updatePushJobStatus = function(job_id, status, result, callback) {
+    this.connection.pushes.update({ 'job.id': job_id }, { $set: { 'job.status': status, 'job.result': result }}, callback);
   };
 
-  MongoDB.prototype.updatePRJobStatus = function(job_id, status, result) {
-    this.connection.pulls.update({ 'jobs.id': job_id }, { $set: { 'jobs.$.status': status, 'jobs.$.result': result }});
+  MongoDB.prototype.updatePRJobStatus = function(job_id, status, result, callback) {
+    this.connection.pulls.update({ 'jobs.id': job_id }, { $set: { 'jobs.$.status': status, 'jobs.$.result': result }}, callback);
   };
 
   MongoDB.prototype.insertLineStatus = function(pull, filename, line_number) {

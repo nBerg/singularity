@@ -401,8 +401,6 @@ Jenkins.prototype.checkPRJob = function(pull) {
       return;
     }
 
-    self.application.db.updatePRJobStatus(job.id, 'finished', build.result);
-
     var event = 'build.' + build.result.toLowerCase().trim(),
         debugInfo = { event: event, repo: pull.repo, number: pull.number, job: job};
 
@@ -448,15 +446,25 @@ Jenkins.prototype.checkPushJob = function(push) {
       return;
     }
 
-    var event = 'push.build.' + build.result.toLowerCase().trim();
-
-    self.application.db.updatePushJobStatus(job.id, 'finished', build.result);
-    self.application.log.debug('Push updated', { project: project, job: job.id, event: event });
-    self.application.emit(event, build);
-
-    if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
-      self.processArtifacts(project.name, build, push);
+    if (job.status === 'finished') {
+      return;
     }
+
+    self.application.db.updatePushJobStatus(job.id, 'finished', build.result, function(err) {
+      if (err) {
+        self.application.log.error('checkPushJob: could not update job to "finished"', err);
+        process.exit(1);
+      }
+
+      var event = 'push.build.' + build.result.toLowerCase().trim();
+
+      self.application.emit(event, build);
+      self.application.log.debug('Push updated', { project: project, job: job.id, event: event });
+
+      if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
+        self.processArtifacts(project.name, build, push);
+      }
+    });
   });
 };
 
