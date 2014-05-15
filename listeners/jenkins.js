@@ -401,6 +401,8 @@ Jenkins.prototype.checkPRJob = function(pull) {
       return;
     }
 
+    self.application.db.updatePRJobStatus(job.id, 'finished', build.result);
+
     var event = 'build.' + build.result.toLowerCase().trim(),
         debugInfo = { event: event, repo: pull.repo, number: pull.number, job: job};
 
