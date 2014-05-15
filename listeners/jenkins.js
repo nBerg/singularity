@@ -387,8 +387,13 @@ Jenkins.prototype.checkPRJob = function(pull) {
     }
 
     if (job.status === 'new') {
-      self.application.db.updatePRJobStatus(job.id, 'started', 'BUILDING');
-      self.application.emit('build.started', job, pull, build.url);
+      self.application.db.updatePRJobStatus(job.id, 'started', 'BUILDING', function(err) {
+        if (err) {
+          self.application.log.error('could not update status of pull', err);
+          process.exit(1);
+        }
+        self.application.emit('build.started', job, pull, build.url);
+      });
       return;
     }
 
@@ -399,13 +404,19 @@ Jenkins.prototype.checkPRJob = function(pull) {
     var event = 'build.' + build.result.toLowerCase().trim(),
         debugInfo = { event: event, repo: pull.repo, number: pull.number, job: job};
 
-    self.application.log.debug('PR event', debugInfo);
-    self.application.emit(event, job, pull, build.url);
-    self.application.db.updatePRJobStatus(job.id, 'finished', build.result);
+    self.application.db.updatePRJobStatus(job.id, 'finished', build.result, function(err) {
+      if (err) {
+        self.application.log.error('could not update status of pull', err);
+        process.exit(1);
+      }
 
-    if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
-      self.processArtifacts(project.name, build, pull);
-    }
+      self.application.log.debug('PR event', debugInfo);
+      self.application.emit(event, job, pull, build.url);
+
+      if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
+        self.processArtifacts(project.name, build, pull);
+      }
+    });
   });
 };
 
