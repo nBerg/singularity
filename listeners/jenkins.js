@@ -450,6 +450,7 @@ Jenkins.prototype.gatherCommentResults = function(job_name, build) {
     }
 
     self.application.emit('build.comment', message);
+    self.application.log.info('build comment', { message: message });
   });
 
   return defer.promise;
