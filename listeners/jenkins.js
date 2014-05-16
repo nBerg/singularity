@@ -7,7 +7,8 @@
 var request = require('request'),
     url = require('url'),
     uuid = require('node-uuid'),
-    async = require('async');
+    async = require('async'),
+    Q = require('q');
 
 /**
  * @class Jenkins
@@ -100,6 +101,7 @@ Jenkins.prototype.findProjectByRepo = function(repo) {
 Jenkins.prototype.start = function() {
   if (!this.application.db) {
     this.application.log.error('Jenkins Listener: missing app db... (╯°□°）╯︵ ┻━┻');
+    this.gatherCommentResults('mergeatron-be.net', { number: 1504 });
     return this;
   }
 
@@ -403,9 +405,54 @@ Jenkins.prototype.checkPRJob = function(pull) {
     self.application.db.updatePRJobStatus(job.id, 'finished', build.result);
 
     if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
+      self.gatherCommentResults(project.name, build);
       self.processArtifacts(project.name, build, pull);
     }
   });
+};
+
+/**
+ * @method gatherCommentResults
+ * @param project_name {String}
+ * @param build {Object}
+ */
+Jenkins.prototype.gatherCommentResults = function(job_name, build) {
+  var self = this,
+      options = {
+        url: url.format({
+          protocol: this.config.protocol,
+          host: this.config.host,
+          pathname: '/job/' + job_name + '/' + build.number + '/injectedEnvVars/api/json'
+        }),
+        json: true
+      };
+
+  if (this.config.user && this.config.pass) {
+    options.headers = {
+      authorization: 'Basic ' + (new Buffer(this.config.user + ":" + this.config.pass, 'ascii').toString('base64'))
+    };
+  }
+
+  var defer = Q.defer();
+
+  self.request(options, function(err, response, body) {
+    if (err) {
+      defer.reject(err);
+      return;
+    }
+
+    var message = 'Build ' + build.fullDisplayName + ' ' + build.result + '. ';
+
+    if (build.result === 'FAILURE') {
+      if (body.envMap && body.envMap.SINGULARITY_FAILURE) {
+        message += body.envMap.SINGULARITY_FAILURE;
+      }
+    }
+
+    self.application.emit('build.comment', message);
+  });
+
+  return defer.promise;
 };
 
 /**
