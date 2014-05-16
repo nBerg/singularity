@@ -17,6 +17,7 @@ exports.init = function(app) {
     ['organization', 'repo', 'project'].forEach(function(param) {
       if (!request.body[param]) {
         app.log.error('missing parameter: ' + param);
+        response_obj.success = false;
         response.send(400, response_obj);
         return;
       }
