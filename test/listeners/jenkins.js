@@ -59,6 +59,36 @@ describe('listeners/jenkins', function() {
     });
   });
 
+  describe('checkPRJob', function() {
+    it('no action when there is no job', function() {
+      var jobStub = sinon.stub(test.jenkins, 'findUnfinishedJob', function() { return null; }),
+          projectStub = sinon.stub(test.jenkins, 'findProjectByRepo', function() { return 'foo'; }),
+          buildByIdSpy = sinon.spy(test.jenkins, 'getBuildById'),
+          logSpy = sinon.stub(test.jenkins.application.log, 'error');
+
+      expect(test.jenkins.checkPRJob({ repo: 'test' })).to.be.undefined;
+      expect(jobStub).to.have.been.called;
+      expect(projectStub).to.have.been.called;
+      expect(buildByIdSpy).to.not.have.been.called;
+      expect(logSpy).to.have.been.calledOnce;
+      expect(logSpy).to.have.been.calledWithExactly('No job for test on myjenkins.host.com');
+    });
+
+    it('no action when there is no project', function() {
+      var jobStub = sinon.stub(test.jenkins, 'findUnfinishedJob', function() { return 'foo'; }),
+          projectStub = sinon.stub(test.jenkins, 'findProjectByRepo', function() { return null; }),
+          buildByIdSpy = sinon.spy(test.jenkins, 'getBuildById'),
+          logSpy = sinon.stub(test.jenkins.application.log, 'error');
+
+      expect(test.jenkins.checkPRJob({ repo: 'test' })).to.be.undefined;
+      expect(jobStub).to.have.been.called;
+      expect(projectStub).to.have.been.called;
+      expect(buildByIdSpy).to.not.have.been.called;
+      expect(logSpy).to.have.been.calledOnce;
+      expect(logSpy).to.have.been.calledWithExactly('No project for test on myjenkins.host.com');
+    });
+  });
+
   describe('findPushProjectForRepo', function() {
     it('finds projects woo', function() {
       expect(test.jenkins.findPushProjectForRepo('test_repo')).to.equal(test.push_project);
