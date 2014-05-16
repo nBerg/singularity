@@ -539,7 +539,7 @@ Jenkins.prototype.getJobBuilds = function(job_name, callback) {
           host: this.config.host,
           pathname: '/job/' + job_name + '/api/json',
           query: {
-            tree: 'builds[number,url,actions[parameters[name,value]],building,result]'
+            tree: 'builds[fullDisplayName,number,url,actions[parameters[name,value]],building,result]'
           }
         }),
         json: true
