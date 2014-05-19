@@ -1,5 +1,6 @@
 var Logger = require('./log'),
     Db = require('./db'),
+    NSQClient = require('nsqjs').Reader,
     fs = require('fs'),
     path = require('path'),
     express = require('express');
@@ -219,6 +220,48 @@ module.exports = function(config, log) {
       app.log.info('Singularity: saved config into DB', { notifying_plugin: plugin });
     });
   });
+
+  if (config.nsq && (config.nsq.host || config.nsq.port)) {
+    var topic = config.nsq.topic || 'singularity',
+        channel = config.nsq.channel || 'repos',
+        host = config.nsq.host || '127.0.0.1',
+        port = config.nsq.port || '4150',
+        url = host + ':' + port,
+        reader = new NSQClient(topic, channel, { nsqdTCPAddresses: url });
+
+    app.log.info('Connection to NSQ Client', { topic: topic, channel: channel, url: url });
+
+    reader.connect();
+
+    reader.on(NSQClient.MESSAGE, function(message) {
+      if (!message.body) {
+        app.log.error('Bad NSQ Message', message.id);
+        return;
+      }
+
+      var data, valid;
+
+      try {
+        data = JSON.parse(message.body.toString()),
+        valid = ['organization', 'repo', 'project'].forEach(function(param) {
+          if (!data[param]) {
+            throw new Error('missing parameter: ' + param);
+          }
+        });
+      }
+      catch(e) {
+        app.log.error('error interpreting NSQ message', { error: e });
+        valid = false;
+      }
+      finally {
+        message.finish();
+      }
+
+      if (valid) {
+        app.addRepoPRJob(data);
+      }
+    });
+  }
 
   return app;
 };
