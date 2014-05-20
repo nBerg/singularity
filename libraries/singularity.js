@@ -3,7 +3,8 @@ var Logger = require('./log'),
     NSQClient = require('nsqjs').Reader,
     fs = require('fs'),
     path = require('path'),
-    express = require('express');
+    express = require('express'),
+    noop = function() {};
 
 module.exports = function(config, log) {
 
@@ -176,9 +177,12 @@ module.exports = function(config, log) {
     return selectData;
   };
 
-  app.addRepoPRJob = function(params) {
+  app.addRepoPRJob = function(params, callback) {
+    callback = callback || noop;
+
     if (app.config.plugins.github.repos.indexOf(params.repo) !== -1) {
       app.log.info('duplicate github repo', params);
+      callback();
       return false;
     }
 
@@ -188,6 +192,7 @@ module.exports = function(config, log) {
 
     if (duplicate) {
       app.log.info('duplicate jenkins repo or project', params);
+      callback();
       return false;
     }
 
@@ -199,6 +204,7 @@ module.exports = function(config, log) {
     });
     app.log.info('Singularity: runtime config updated');
 
+    callback();
     return true;
   };
 
@@ -258,7 +264,12 @@ module.exports = function(config, log) {
       }
 
       if (valid) {
-        app.addRepoPRJob(data);
+        app.log.info('pausing NSQ');
+        reader.pause();
+        app.addRepoPRJob(data, function() {
+          app.log.info('unpausing NSQ');
+          reader.unpause();
+        });
       }
     });
   }
