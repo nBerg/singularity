@@ -5,7 +5,9 @@ exports.config = {
   // port that express will run on
   port: '8080',
   // info or debug
-  log_level: 'debug',
+  log: {
+    level: 'debug'
+  },
   // whether to save this configuration into the database
   // and opt to use stored configs over this file
   persist_config: true,
@@ -19,7 +21,7 @@ exports.config = {
       db: 'mergeatron',
       slaveOk: false
     },
-    collections: [ 'pulls', 'pushes', 'merges' ]
+    collections: ['pulls', 'pushes', 'merges']
   },
   plugins: {
     github: {
