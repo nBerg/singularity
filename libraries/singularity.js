@@ -1,8 +1,43 @@
-var Logger = require('./log'),
+var Class = require('nbd/Class'),
+    pubsub = require('nbd/trait/pubsub'),
+    q = require('q'),
+	Logger = require('./log'),
     Db = require('./db'),
     fs = require('fs'),
     path = require('path'),
     express = require('express');
+
+Singularity = Class.extend({
+  init: function(app) {
+    this._app = app;
+  },
+
+  route: function(routes) {
+    var app = this._app;
+
+    if (routes == null) { return; }
+
+    Object.keys(routes)
+    .forEach(function(path) {
+      var self = this;
+      app.use(path, function(req, res, next) {
+        var deferred = q.defer();
+        deferred.resolve(req);
+
+        deferred.promise
+        .then(this)
+        .done(function(meta) {
+          self.trigger(meta);
+          res.send(meta.status || 200, meta.body || meta);
+        }, function(meta) {
+          res.send(meta.status || 500, meta.body || meta);
+        })
+        .finally(next);
+      }.bind(this.routes[path]));
+    }, this);
+  }
+})
+.mixin(pubsub);
 
 module.exports = function(config, log) {
 

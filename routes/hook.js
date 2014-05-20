@@ -1,4 +1,5 @@
-var range_check = require('range_check');
+var range_check = require('range_check'),
+    q = require('q');
 
 // We only want to accept local requests and GitHub requests. See the Service Hooks
 // page of any repo you have admin access to to see the list of GitHub public IPs.
@@ -13,6 +14,65 @@ var allowed_ips = ['127.0.0.1'],
         '192.30.252.0/22'
     ];
 
+function ipCheck(request) {
+  if (~allowed_ips.indexOf(request.connection.remoteAddress)) {
+    return request;
+  }
+
+  if (allowed_ranges.some(function(range) {
+    return range_check.in_range(request.connection.remoteAddress, range);
+  })) {
+    return request;
+  }
+
+  throw {
+    status: 403,
+    body: {
+      message: 'Not allowed'
+    }
+  };
+}
+
+function eventCheck(request) {
+  var githubEvent = request.headers['x-github-event'];
+  if (githubEvent === undefined ||
+      !~allowed_events.indexOf(githubEvent)) {
+    throw {
+      status: 501,
+      body: {
+        message: 'Unsupported event type ' + githubEvent
+      }
+    };
+  }
+  return request;
+}
+
+module.exports = function(request) {
+  return q(request)
+  .then(ipCheck)
+  .then(eventCheck)
+  .then(function(request) {
+    var data;
+
+    try {
+      data = JSON.parse(request.body);
+    }
+    catch(err) {
+      throw {
+        status: 422,
+        body: {
+          message: 'Invalid payload sent. Make sure content type == "application/json"'
+        }
+      };
+    }
+
+    var meta = {};
+    meta[request.headers['x-github-event']] = data;
+    return meta;
+  });
+};
+
+/*
 exports.init = function(app, request, response) {
 
   var response_obj = {
@@ -67,3 +127,4 @@ exports.init = function(app, request, response) {
 
   response.send(200, response_obj);
 };
+*/
