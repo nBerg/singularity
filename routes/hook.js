@@ -47,7 +47,7 @@ function eventCheck(request) {
   return request;
 }
 
-module.exports = function(request) {
+function githubEvent(request) {
   return q(request)
   .then(ipCheck)
   .then(eventCheck)
@@ -70,7 +70,11 @@ module.exports = function(request) {
     meta[request.headers['x-github-event']] = data;
     return meta;
   });
-};
+}
+
+githubEvent.method = "post";
+
+module.exports = githubEvent;
 
 /*
 exports.init = function(app, request, response) {
