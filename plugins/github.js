@@ -1,6 +1,6 @@
 "use strict";
 
-var GithubWrapper = require('./libraries/github'),
+var GithubWrapper = require('../libraries/github'),
 plugin;
 
 module.exports = plugin = {
