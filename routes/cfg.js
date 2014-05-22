@@ -1,30 +1,28 @@
-var bodyParser = require('body-parser');
-
-exports.init = function(app) {
-  app.use(bodyParser());
-
-  var route = require('express').Router();
-
-  route.get('/', function(request, response, next) {
-    response.send(200, app.getConfig());
-  });
-
-  route.post('/pull_request', function(request, response, next) {
-    var response_obj = {
-      success: true
-    };
-
-    ['organization', 'repo', 'project'].forEach(function(param) {
-      if (!request.body[param]) {
-        app.log.error('missing parameter: ' + param);
-        response.send(400, response_obj);
-        return;
+function addRepoPRJob(request) {
+  ['organization', 'repo', 'project'].forEach(function(param) {
+    if (!request.body[param]) {
+      throw {
+        body: {
+          message: 'missing parameter: ' + param
+        },
+        status: 400
       }
-    });
-
-    app.addRepoPRJob(request.body);
-    response.send(200, response_obj);
+    }
   });
 
-  return route;
-};
+  return {
+    'GitHub.config': {
+      organization: request.body.organization,
+      repo: request.body.repo
+    },
+    'Jenkins.config': {
+      project: request.body.project,
+      repo: request.body.repo,
+      token: request.body.token || false
+    }
+  };
+}
+
+addRepoPRJob.method = 'post';
+
+module.exports = addRepoPRJob;

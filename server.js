@@ -2,27 +2,32 @@
 var flatiron = require('flatiron'),
     app = flatiron.app;
 
+// configure & init the flatiron app *then* instantiate singularity
+// init() instantiates the logs
+// also, because singletons, and I hate everything
+app.use(flatiron.plugins.http);
 app.config.file('./config.json');
 app.config.defaults({
-  port: 80
+  port: 8080,
+  log: {
+    console: {
+      level: 'debug',
+      colorize: true
+    }
+  }
 });
+
+app.init();
 
 var singularity = require('./libraries/singularity');
-
-app.use(flatiron.plugins.http);
-app.attemptDbConfigLoad(function() {
-  app.loadListeners([__dirname + '/listeners']);
-});
-
-app.use(require('./plugin/github'));
-
 var server = app.start(app.config.get('port'), function() {
+  singularity.injectFlatironPlugins(__dirname + '/plugins');
   singularity.route({
-    '/': require('./routes/hook'),
+    '/hook': require('./routes/hook'),
+    '/config': require('./routes/cfg'),
     '/pull_requests': require('./routes/pull_requests'),
-    '/merge': require('./routes/merge'),
-    '/config': require('./routes/cfg')
+    '/merge': require('./routes/merge')
   });
 
-  app.log.info('Listening on port %d', server.address().port);
+  app.log.info('Listening on port %d', app.config.get('port'));
 });
