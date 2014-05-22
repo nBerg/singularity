@@ -13,8 +13,17 @@ module.exports = require('nbd/Class').extend({
       host: option.host,
       port: option.port
     });
-    this.channel = postal.channel();
+    this.channel = postal.channel('GitHub');
     this.error = this.error.bind(this);
+  },
+
+  addRepo: function(repo) {
+    if (!this.config.repos) {
+      this.config.repos = [];
+    }
+
+    this.log.info('GitHub Lib: adding repo', repo);
+    this.config.repos.push(repo);
   },
 
   error: function(error) {
