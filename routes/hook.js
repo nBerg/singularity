@@ -67,7 +67,8 @@ function githubEvent(request) {
     }
 
     var meta = {};
-    meta[request.headers['x-github-event']] = data;
+    meta['GitHub.' + request.headers['x-github-event']] = data;
+
     return meta;
   });
 }
@@ -75,60 +76,3 @@ function githubEvent(request) {
 githubEvent.method = "post";
 
 module.exports = githubEvent;
-
-/*
-exports.init = function(app, request, response) {
-
-  var response_obj = {
-    message: 'received',
-    error: false
-  };
-
-  if (allowed_ips.indexOf(request.connection.remoteAddress) === -1) {
-    var allowed = false;
-    for (var i in allowed_ranges) {
-      if (range_check.in_range(request.connection.remoteAddress, allowed_ranges[i])) {
-        allowed = true;
-      }
-    }
-
-    if (!allowed) {
-      app.log.debug('Received post from blocked ip: ' + request.connection.remoteAddress);
-      response_obj.message = 'not allowed';
-      response_obj.error = true;
-      response.send(403, response_obj);
-      return;
-    }
-  }
-
-  if (typeof request.headers['x-github-event'] === 'undefined' ||
-      allowed_events.indexOf(request.headers['x-github-event']) === -1) {
-    app.log.debug('Received post for unsupported event: ' + request.headers['x-github-event']);
-    response_obj.message = 'unsupported event type';
-    response_obj.error = true;
-    response.send(501, response_obj);
-    return;
-  }
-
-  var data = '';
-  request.on('data', function(chunk) {
-    data += chunk.toString();
-  });
-
-  request.on('end', function() {
-    app.log.debug('Received post for event: ' + request.headers['x-github-event']);
-
-    try {
-      app.emit(request.headers['x-github-event'], JSON.parse(data));
-    }
-    catch(err) {
-      app.log.error('Invalid github webhook event received!');
-      response_obj.error = 'Invalid payload sent. Make sure content type == "application/json"';
-      response.send(422, response_obj);
-      return;
-    }
-  });
-
-  response.send(200, response_obj);
-};
-*/
