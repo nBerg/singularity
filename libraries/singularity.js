@@ -139,8 +139,6 @@ function pluginSubscriptions(meta) {
 }
 
 var Singularity = Class.extend({
-  plugins: [],
-
   initChannels: function() {
     var githubTopics = {
       plugin: 'github',
@@ -207,7 +205,6 @@ var Singularity = Class.extend({
           app.use(plugin, appCfg);
 
           plugin.publish = postal.channel(pluginName).publish;
-          this.plugins.push(pluginName);
        }.bind(this));
      }.bind(this))
      .catch(this.error);
