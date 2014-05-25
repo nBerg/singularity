@@ -22,6 +22,7 @@ app.init();
 var singularity = require('./libraries/singularity');
 var server = app.start(app.config.get('port'), function() {
   singularity.injectFlatironPlugins(__dirname + '/plugins');
+  singularity.initChannels();
   singularity.route({
     '/hook': require('./routes/hook'),
     '/config': require('./routes/cfg'),

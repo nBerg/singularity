@@ -2,10 +2,20 @@
 
 var GitHubApi = require('github'),
 async = require('async'),
-postal = require('postal'),
 q = require('q');
 
 module.exports = require('nbd/Class').extend({
+  publisher: null,
+
+  publish: function(topic, data) {
+    if (!this.publisher) {
+      this.error('cannot publish topic, no channel', arguments);
+      return;
+    }
+
+    this.publisher(topic, data);
+  },
+
   init: function(option) {
     this.config = option;
     this._api = new GitHubApi({
@@ -13,17 +23,22 @@ module.exports = require('nbd/Class').extend({
       host: option.host,
       port: option.port
     });
-    this.channel = postal.channel('GitHub');
     this.error = this.error.bind(this);
   },
 
-  addRepo: function(repo) {
+  addRepo: function(data) {
+    if (!data.repo || !data.organization) {
+      throw 'Missing repo or organization in passed data';
+    }
+
     if (!this.config.repos) {
       this.config.repos = [];
     }
 
     this.log.info('GitHub Lib: adding repo', repo);
     this.config.repos.push(repo);
+
+    return this.setupRepoHook(repo);
   },
 
   error: function(error) {
@@ -92,7 +107,7 @@ module.exports = require('nbd/Class').extend({
             number: pull.number
           })
           .then(function(pull) {
-            this.channel.publish('pull_request', pull);
+            this.publish('pull_request', pull);
           }.bind(this));
         }, this));
       }.bind(this))
@@ -171,7 +186,7 @@ module.exports = require('nbd/Class').extend({
       });
 
       if (pull.files.length > 0) {
-        this.channel.publish('pull.found', pull);
+        this.publish('pull.found', pull);
       }
       else {
         this.log.info('Skipping pull request, no modified files found', { pull_number: pull.number, repo: pull.repo });
@@ -224,12 +239,12 @@ module.exports = require('nbd/Class').extend({
       }
 
       if (new_pull || pull.head.sha !== item.head) {
-        self.channel.publish('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
+        self.publish('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
         return;
       }
 
       if (typeof pull.skip_comments !== 'undefined' && pull.skip_comments) {
-        self.channel.publish('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
+        self.publish('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
         return;
       }
 
@@ -255,7 +270,7 @@ module.exports = require('nbd/Class').extend({
           }
 
           if (comment.created_at > item.updated_at && comment.body.indexOf('@' + self.config.auth.username + ' retest') !== -1) {
-            self.channel.publish('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
+            self.publish('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
             return;
           }
         }
@@ -339,12 +354,12 @@ module.exports = require('nbd/Class').extend({
         this.application.db.updatePull(pull.number, base_repo_name, { status: pull.action });
         if (pull.pull_request.merged) {
           this.log.debug('pull was merged, skipping');
-          this.channel.publish('pull.merged', pull);
+          this.publish('pull.merged', pull);
           this.application.db.updatePull(pull.number, base_repo_name, { status: 'merged' });
         }
         else {
           this.log.debug('pull was closed, skipping');
-          this.channel.publish('pull.closed', pull);
+          this.publish('pull.closed', pull);
         }
 
         return;
@@ -375,7 +390,7 @@ module.exports = require('nbd/Class').extend({
     if (this.config.skip_file_listing) {
       this.log.debug('skipping file listing for PR');
       pull.files = [];
-      this.channel.publish('pull.found', pull);
+      this.publish('pull.found', pull);
     }
     else {
       this.checkFiles(pull);
@@ -407,7 +422,7 @@ module.exports = require('nbd/Class').extend({
     })
     .then(function(pull) {
       pull.skip_comments = true;
-      this.channel.publish('pull_request', pull);
+      this.publish('pull_request', pull);
     }.bind(this))
     .catch(this.error);
   },
@@ -445,7 +460,7 @@ module.exports = require('nbd/Class').extend({
           self.log.error(err);
           return;
         }
-        self.channel.publish('push.found', payload);
+        self.publish('push.found', payload);
       });
     });
   },

@@ -8,7 +8,7 @@ module.exports = plugin = {
 
   attach: function(options) {
     this.github = new GithubWrapper(options);
-    this.github.log = this.log.get(plugin.name);
+    this.github.log = this.log;
   },
 
   init: function(done) {

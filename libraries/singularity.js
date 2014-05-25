@@ -6,12 +6,27 @@ var Class = require('nbd/Class'),
     path = require('path'),
     postal = require('postal');
 
+/**
+ * Iterate through an array of postal envelopes & publish
+ *
+ * @param {Array} events Objects that have channel, topic & data fields
+ */
 function publishEvents(events) {
   events.forEach(function(event) {
     postal.publish(event);
   });
 }
 
+/**
+ * Given an object, attempt to create postal objects that *may* be
+ * recognizable internally
+ *
+ * @param {Object} meta Loops through the fields of meta, except for
+ *                      body & status, formats the data into postal
+ *                      postal envelopes. The returned promise
+ *                      resolves with an array of these objects
+ * @return {Object} A promise
+ */
 function packageMeta(meta) {
   return q.fcall(function() {
     return Object.keys(meta).filter(function(field) {
@@ -21,6 +36,7 @@ function packageMeta(meta) {
   .then(function(metaFields) {
     var envelopes = [];
 
+    // honestly have no idea if this resolves synchronously
     metaFields.forEach(function(field) {
       envelopes.push({
         channel: field.substring(0, field.indexOf('.')),
@@ -33,6 +49,12 @@ function packageMeta(meta) {
   });
 }
 
+/**
+ * Used to safely wrap function ret vals & respond to requests
+ *
+ * @param {Object} route A function that returns *some* object
+ * @return {Object} A promise
+ */
 function requestWrapper(route) {
   var deferred = q.defer();
   deferred.resolve(this.req);
@@ -55,6 +77,12 @@ function requestWrapper(route) {
   return retval;
 }
 
+/**
+ * Given a config, fills in the blanks that are required
+ *
+ * @param {Object} config
+ * @return {Object} update config
+ */
 function standardizeConfig(config) {
   if (!config.plugins) {
     config.plugins = {};
@@ -81,20 +109,60 @@ function standardizeConfig(config) {
   }
 
   return config;
-};
+}
+
+
+function pluginSubscriptions(meta) {
+  return q.invoke(function validatePostalMeta() {
+    if (!meta.subscriptions || !meta.plugin) {
+      throw 'missing metadata fields;  plugin & subscriptions required';
+    }
+    return meta;
+  })
+  .done(function(meta) {
+    meta.subscriptions.forEach(function(subscription) {
+      var channel = subscription.channel || meta.plugin,
+      channelObj = postal.channel(channel);
+
+      app.log.info('creating subscription', {
+        channel: channel,
+        topic: subscription.topic,
+        plugin: meta.plugin,
+        callback: subscription.callback
+      });
+
+      channelObj.subscribe(subscription.topic, function(data, envelope) {
+        app[meta.plugin][subscription.callback](data);
+      });
+    });
+  });
+}
 
 var Singularity = Class.extend({
-  init: function() {
-    this.githubChannel = postal.channel('GitHub');
-    this.githubChannel.subscribe('config', function(data, envelope) {
-      if (!data.repo) {
-        app.log.error('no repo given');
-        return;
-      }
-      app.github.addRepo(data.repo);
-    });
+  plugins: [],
 
-    this.jenkinsChannel = postal.channel('Jenkins');
+  initChannels: function() {
+    var githubTopics = {
+      plugin: 'github',
+      subscriptions: [
+        { topic: 'pull_request', callback: 'handlePullRequest' },
+        { topic: 'issue_comment', callback: 'handleIssueComment' },
+        { topic: 'push', callback: 'handlePush' },
+        { topic: 'config', callback: 'addRepo' },
+        { channel: 'jenkins', topic: 'build.*', callback: 'createStatus' }
+      ]
+    },
+    jenkinsTopics = {
+      plugin: 'jenkins',
+      subscriptions: [
+        { channel: 'github', topic: 'pull.found', callback: 'pullFound' },
+        { channel: 'github', topic: 'pull.processed', callback: 'buildPull' },
+        { channel: 'github', topic: 'push.found', callback: 'pushFound' }
+      ]
+    };
+
+    pluginSubscriptions(githubTopics);
+    pluginSubscriptions(jenkinsTopics);
   },
 
   route: function(routes) {
@@ -122,17 +190,24 @@ var Singularity = Class.extend({
     q.ninvoke(fs, 'readdir', dir)
      .then(function(files) {
        files.forEach(function(file) {
-         var filename = path.join(dir, file),
-             pluginName = file.substring(0, file.lastIndexOf('.')),
-             appCfg = app.config.get(pluginName);
+          var filename = path.join(dir, file),
+              pluginName = file.substring(0, file.lastIndexOf('.')),
+              appCfg = app.config.get(pluginName);
 
-         if (!filename.match(/\.js$/) || !appCfg || appCfg.disabled) {
-           this.error('Skipping plugin', { name: pluginName });
-           return;
-         }
+          if (!filename.match(/\.js$/) || !appCfg || appCfg.disabled) {
+            this.error('Skipping plugin', { name: pluginName });
+            return;
+          }
 
-         app.log.info('loading plugin', pluginName);
-         app.use(require(filename), appCfg);
+          app.log.info('loading plugin', pluginName);
+
+          var plugin = require(filename);
+
+          plugin.name = pluginName;
+          app.use(plugin, appCfg);
+
+          plugin.publish = postal.channel(pluginName).publish;
+          this.plugins.push(pluginName);
        }.bind(this));
      }.bind(this))
      .catch(this.error);
