@@ -178,6 +178,14 @@ var Singularity = Class.extend({
       { channel: 'db', topic: 'pull_request.build.stored', plugin: 'github', callback: 'createStatus' }
     ],
 
+    commentChain = [
+      // depending on whether the callback publishes an event or not, the rest of the chain *should* be
+      // equivalent to the `pullChain`
+      // i.e.: `handleIssueComment()` must publish data that is isometric to a regular pull_request
+      //       event payload
+      { channel: 'github', topic: 'issue_comment', plugin: 'github', callback: 'handleIssueComment' }
+    ],
+
     configEvents = [
       { channel: 'github', topic: 'config', plugin: 'github', callback: 'addRepo' },
       { channel: 'jenkins', topic: 'config', plugin: 'jenkins', callback: 'addProject' },
@@ -185,6 +193,7 @@ var Singularity = Class.extend({
 
     this.createChannelEventChain(pushChain);
     this.createChannelEventChain(pullChain);
+    this.createChannelEventChain(commentChain);
     this.createChannelEventChain(configEvents);
   },
 
