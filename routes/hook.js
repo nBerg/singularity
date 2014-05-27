@@ -67,7 +67,7 @@ function githubEvent(request) {
     }
 
     var meta = {};
-    meta['GitHub.' + request.headers['x-github-event']] = data;
+    meta['github.' + request.headers['x-github-event']] = data;
 
     return meta;
   });

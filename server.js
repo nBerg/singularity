@@ -5,19 +5,8 @@ var flatiron = require('flatiron'),
 // configure & init the flatiron app *then* instantiate singularity
 // init() instantiates the logs
 // also, because singletons, and I hate everything
-app.use(flatiron.plugins.http);
 app.config.file('./config.json');
-app.config.defaults({
-  port: 8080,
-  log: {
-    console: {
-      level: 'debug',
-      colorize: true
-    }
-  }
-});
-
-app.init();
+app.use(flatiron.plugins.http);
 
 var singularity = require('./libraries/singularity');
 var server = app.start(app.config.get('port'), function() {

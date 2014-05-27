@@ -81,31 +81,27 @@ function requestWrapper(route) {
  * Given a config, fills in the blanks that are required
  *
  * @param {Object} config
- * @return {Object} update config
+ * @return {Object} updated config
  */
 function standardizeConfig(config) {
-  if (!config.plugins) {
-    config.plugins = {};
+  if (!config.github) {
+    config.github = {};
   }
 
-  if (!config.plugins.github) {
-    config.plugins.github = {};
+  if (!config.github.repos) {
+    config.github.repos = [];
   }
 
-  if (!config.plugins.github.repos) {
-    config.plugins.github.repos = [];
+  if (!config.jenkins) {
+    config.jenkins = {};
   }
 
-  if (!config.plugins.jenkins) {
-    config.plugins.jenkins = {};
+  if (!config.jenkins.projects) {
+    config.jenkins = [];
   }
 
-  if (!config.plugins.jenkins.projects) {
-    config.plugins.jenkins = [];
-  }
-
-  if (!config.plugins.jenkins.push_projects) {
-    config.plugins.jenkins.push_projects = {};
+  if (!config.jenkins.push_projects) {
+    config.jenkins.push_projects = {};
   }
 
   return config;
@@ -122,7 +118,10 @@ function pluginSubscriptions(meta) {
   .done(function(meta) {
     meta.subscriptions.forEach(function(subscription) {
       var channel = subscription.channel || meta.plugin,
-      channelObj = postal.channel(channel);
+      channelObj = postal.channel(channel),
+      callback = function(data, envelope) {
+        app[meta.plugin][subscription.callback](data);
+      };
 
       app.log.info('creating subscription', {
         channel: channel,
@@ -131,14 +130,27 @@ function pluginSubscriptions(meta) {
         callback: subscription.callback
       });
 
-      channelObj.subscribe(subscription.topic, function(data, envelope) {
-        app[meta.plugin][subscription.callback](data);
-      });
+      channelObj.subscribe(subscription.topic, callback);
     });
   });
 }
 
 var Singularity = Class.extend({
+  init: function() {
+    var defaultConfig = standardizeConfig({
+      fake_events: false,
+      port: 8080,
+      log: {
+        console: {
+          level: 'debug',
+          colorize: true
+        }
+      }
+    });
+    app.config.defaults(defaultConfig);
+    app.init();
+  },
+
   initChannels: function() {
     var githubTopics = {
       plugin: 'github',

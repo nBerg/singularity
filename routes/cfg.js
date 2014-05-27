@@ -11,11 +11,11 @@ function addRepoPRJob(request) {
   });
 
   return {
-    'GitHub.config': {
+    'github.config': {
       organization: request.body.organization,
       repo: request.body.repo
     },
-    'Jenkins.config': {
+    'jenkins.config': {
       project: request.body.project,
       repo: request.body.repo,
       token: request.body.token || false
