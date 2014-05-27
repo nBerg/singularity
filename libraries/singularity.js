@@ -107,38 +107,38 @@ function standardizeConfig(config) {
   return config;
 }
 
-
-function pluginSubscriptions(meta) {
-  return q.invoke(function validatePostalMeta() {
-    if (!meta.subscriptions || !meta.plugin) {
-      throw 'missing metadata fields;  plugin & subscriptions required';
+function validateSubscriptions(events) {
+  return q.fcall(function validateEvents() {
+    if (!Array.isArray(events)) {
+      throw 'events must be an array';
     }
-    return meta;
-  })
-  .done(function(meta) {
-    meta.subscriptions.forEach(function(subscription) {
-      var channel = subscription.channel || meta.plugin,
-      channelObj = postal.channel(channel),
-      callback = function(data, envelope) {
-        app[meta.plugin][subscription.callback](data);
-      };
-
-      app.log.info('creating subscription', {
-        channel: channel,
-        topic: subscription.topic,
-        plugin: meta.plugin,
-        callback: subscription.callback
+    events.forEach(function validateEvent(event) {
+      ['channel', 'topic', 'plugin', 'callback'].forEach(function(param) {
+        if (!event[param]) {
+          throw 'missing param "' + param + '" in ' + JSON.stringify(event);
+        }
       });
-
-      channelObj.subscribe(subscription.topic, callback);
     });
+    return events;
+  });
+}
+
+function createSubscriptions(events) {
+  events.forEach(function(event) {
+    app.log.info('creating subscription', event);
+
+    var channelObj = postal.channel(event.channel),
+    callback = function(data, envelope) {
+      app[event.plugin][event.callback](data);
+    };
+
+    channelObj.subscribe(event.topic, callback);
   });
 }
 
 var Singularity = Class.extend({
   init: function() {
     var defaultConfig = standardizeConfig({
-      fake_events: false,
       port: 8080,
       log: {
         console: {
@@ -149,30 +149,43 @@ var Singularity = Class.extend({
     });
     app.config.defaults(defaultConfig);
     app.init();
+
+    this.log = app.log;
+  },
+
+  createChannelEventChain: function(chain) {
+    validateSubscriptions(chain)
+    .then(createSubscriptions)
+    .catch(this.log.error)
+    .done();
   },
 
   initChannels: function() {
-    var githubTopics = {
-      plugin: 'github',
-      subscriptions: [
-        { topic: 'pull_request', callback: 'handlePullRequest' },
-        { topic: 'issue_comment', callback: 'handleIssueComment' },
-        { topic: 'push', callback: 'handlePush' },
-        { topic: 'config', callback: 'addRepo' },
-        { channel: 'jenkins', topic: 'build.*', callback: 'createStatus' }
-      ]
-    },
-    jenkinsTopics = {
-      plugin: 'jenkins',
-      subscriptions: [
-        { channel: 'github', topic: 'pull.found', callback: 'pullFound' },
-        { channel: 'github', topic: 'pull.processed', callback: 'buildPull' },
-        { channel: 'github', topic: 'push.found', callback: 'pushFound' }
-      ]
-    };
+    var pushChain = [
+      { channel: 'github', topic: 'push', plugin: 'github', callback: 'handlePush' },
+      { channel: 'github', topic: 'push.lookup', plugin: 'db', callback: 'findPush' },
+      { channel: 'db', topic: 'push.found', plugin: 'github', callback: 'processPush' },
+      { channel: 'github', topic: 'push.validated', plugin: 'jenkins', callback: 'buildPush' },
+      { channel: 'jenkins', topic: 'push.triggered', plugin: 'db', callback: 'insertPush' }
+    ],
 
-    pluginSubscriptions(githubTopics);
-    pluginSubscriptions(jenkinsTopics);
+    pullChain = [
+      { channel: 'github', topic: 'pull_request', plugin: 'github', callback: 'handlePullRequest' },
+      { channel: 'github', topic: 'pull_request.lookup', plugin: 'db', callback: 'findPullRequest' },
+      { channel: 'db', topic: 'pull_request.found', plugin: 'github', callback: 'processPullRequest' },
+      { channel: 'github', topic: 'pull_request.validated', plugin: 'jenkins', callback: 'buildPullRequest' },
+      { channel: 'jenkins', topic: 'pull_request.triggered', plugin: 'db', callback: 'insertPullRequest' },
+      { channel: 'db', topic: 'pull_request.build.stored', plugin: 'github', callback: 'createStatus' }
+    ],
+
+    configEvents = [
+      { channel: 'github', topic: 'config', plugin: 'github', callback: 'addRepo' },
+      { channel: 'jenkins', topic: 'config', plugin: 'jenkins', callback: 'addProject' },
+    ];
+
+    this.createChannelEventChain(pushChain);
+    this.createChannelEventChain(pullChain);
+    this.createChannelEventChain(configEvents);
   },
 
   route: function(routes) {
