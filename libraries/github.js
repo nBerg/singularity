@@ -4,25 +4,15 @@ var GitHubApi = require('github'),
 async = require('async'),
 q = require('q');
 
-module.exports = require('nbd/Class').extend({
-  publisher: null,
-
-  publish: function(topic, data) {
-    if (!this.publisher) {
-      this.error('cannot publish topic, no channel', arguments);
-      return;
-    }
-    this.publisher(topic, data);
-  },
-
+module.exports = require('./plugin_base').extend({
   init: function(option) {
-    this.config = option;
+    this._super(option);
     this._api = new GitHubApi({
       version: '3.0.0',
       host: option.host,
       port: option.port
     });
-    this.error = this.error.bind(this);
+    this.authenticate();
   },
 
   addRepo: function(data) {
@@ -38,10 +28,6 @@ module.exports = require('nbd/Class').extend({
     this.config.repos.push(repo);
 
     return this.setupRepoHook(repo);
-  },
-
-  error: function(error) {
-    this.log.error(error);
   },
 
   /**
@@ -72,7 +58,6 @@ module.exports = require('nbd/Class').extend({
   },
 
   authenticate: function() {
-    this.log.debug('Polling github for new and updated Pull Requests');
     this._api.authenticate(this.config.auth);
   },
 
@@ -227,7 +212,6 @@ module.exports = require('nbd/Class').extend({
    */
   createStatus: function(sha, user, repo, state, build_url, description) {
     this.log.info('creating status ' + state + ' for sha ' + sha + ' for build_url ' + build_url);
-    this.authenticate();
     return q.ninvoke(this._api.statuses, 'create', {
       user: user,
       repo: repo,
@@ -250,7 +234,6 @@ module.exports = require('nbd/Class').extend({
    * @param comment {String}
    */
   createComment: function(pull, sha, file, position, comment) {
-    this.authenticate();
     if (!file && !position && !comment) {
       return q.ninvoke(this._api.issues, 'createComment', {
         user: this.config.user,
