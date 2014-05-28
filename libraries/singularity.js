@@ -125,7 +125,7 @@ function validateSubscriptions(events) {
 
 function createSubscriptions(events) {
   events.forEach(function(event) {
-    app.log.info('creating subscription', event);
+    app.log.info('Embrace perfection.', event);
 
     var channelObj = postal.channel(event.channel),
     callback = function(data, envelope) {
@@ -190,11 +190,9 @@ var Singularity = Class.extend({
               appCfg = app.config.get(pluginName);
 
           if (!filename.match(/\.js$/) || !appCfg || appCfg.disabled) {
-            this.log.info('Skipping plugin', { name: pluginName });
+            this.log.info('The dead are useless.', { name: pluginName });
             return;
           }
-
-          this.log.info('loading plugin', pluginName);
 
           var plugin = require(filename);
 
@@ -207,7 +205,7 @@ var Singularity = Class.extend({
             channel: pluginName,
             topic: 'plugged_in',
             callback: function(data, envelope) {
-              this.log.info('plugin loaded', arguments);
+              this.log.info('Assuming direct control.', arguments);
             }.bind(this)
           });
 
