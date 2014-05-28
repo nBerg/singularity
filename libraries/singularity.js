@@ -160,43 +160,6 @@ var Singularity = Class.extend({
     .done();
   },
 
-  initChannels: function() {
-    var pushChain = [
-      { channel: 'github', topic: 'push', plugin: 'github', callback: 'handlePush' },
-      { channel: 'github', topic: 'push.lookup', plugin: 'db', callback: 'findPush' },
-      { channel: 'db', topic: 'push.found', plugin: 'github', callback: 'processPush' },
-      { channel: 'github', topic: 'push.validated', plugin: 'jenkins', callback: 'buildPush' },
-      { channel: 'jenkins', topic: 'push.triggered', plugin: 'db', callback: 'insertPush' }
-    ],
-
-    pullChain = [
-      { channel: 'github', topic: 'pull_request', plugin: 'github', callback: 'handlePullRequest' },
-      { channel: 'github', topic: 'pull_request.lookup', plugin: 'db', callback: 'findPullRequest' },
-      { channel: 'db', topic: 'pull_request.found', plugin: 'github', callback: 'processPullRequest' },
-      { channel: 'github', topic: 'pull_request.validated', plugin: 'jenkins', callback: 'buildPullRequest' },
-      { channel: 'jenkins', topic: 'pull_request.triggered', plugin: 'db', callback: 'insertPullRequest' },
-      { channel: 'db', topic: 'pull_request.build.stored', plugin: 'github', callback: 'createStatus' }
-    ],
-
-    commentChain = [
-      // depending on whether the callback publishes an event or not, the rest of the chain *should* be
-      // equivalent to the `pullChain`
-      // i.e.: `handleIssueComment()` must publish data that is isometric to a regular pull_request
-      //       event payload
-      { channel: 'github', topic: 'issue_comment', plugin: 'github', callback: 'handleIssueComment' }
-    ],
-
-    configEvents = [
-      { channel: 'github', topic: 'config', plugin: 'github', callback: 'addRepo' },
-      { channel: 'jenkins', topic: 'config', plugin: 'jenkins', callback: 'addProject' },
-    ];
-
-    this.createChannelEventChain(pushChain);
-    this.createChannelEventChain(pullChain);
-    this.createChannelEventChain(commentChain);
-    this.createChannelEventChain(configEvents);
-  },
-
   route: function(routes) {
     if (routes == null) { return; }
 
@@ -227,11 +190,11 @@ var Singularity = Class.extend({
               appCfg = app.config.get(pluginName);
 
           if (!filename.match(/\.js$/) || !appCfg || appCfg.disabled) {
-            this.error('Skipping plugin', { name: pluginName });
+            this.log.info('Skipping plugin', { name: pluginName });
             return;
           }
 
-          app.log.info('loading plugin', pluginName);
+          this.log.info('loading plugin', pluginName);
 
           var plugin = require(filename);
 
@@ -239,9 +202,20 @@ var Singularity = Class.extend({
           app.use(plugin, appCfg);
 
           plugin.publish = postal.channel(pluginName).publish;
+
+          postal.subscribe({
+            channel: pluginName,
+            topic: 'plugged_in',
+            callback: function(data, envelope) {
+              this.log.info('plugin loaded', arguments);
+            }.bind(this)
+          });
+
+          plugin.publish('plugged_in', pluginName);
        }.bind(this));
      }.bind(this))
-     .catch(this.error);
+     .catch(this.error)
+     .done();
   }
 });
 
