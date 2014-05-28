@@ -12,7 +12,6 @@ module.exports = require('nbd/Class').extend({
       this.error('cannot publish topic, no channel', arguments);
       return;
     }
-
     this.publisher(topic, data);
   },
 
@@ -186,7 +185,7 @@ module.exports = require('nbd/Class').extend({
       });
 
       if (pull.files.length > 0) {
-        this.publish('pull.found', pull);
+        this.publish('pull_request.validated', pull);
       }
       else {
         this.log.info('Skipping pull request, no modified files found', { pull_number: pull.number, repo: pull.repo });
@@ -196,86 +195,23 @@ module.exports = require('nbd/Class').extend({
   },
 
   /**
-   * Starts the process of processing a pull request. Will retrieve the pull request from the database or insert a new
-   * record for it if needed. The pull request is then checked to see if it should be processed or not and dispatches
-   * the appropriate event if so.
+   * Decide whether this PR is considered to be updated or not
    *
-   * @method processPull
+   * @method processPullRequest
    * @param pull {Object}
    */
-  processPull: function(pull) {
-    var self = this;
-    this.application.db.findPull(pull.number, pull.repo, function(error, item) {
-      if (!pull.head || !pull.head.repo) {
-        self.log.error('Skipping pull request, invalid payload given', { pull_number: pull.number, repo: pull.repo });
-        return;
-      }
+  processPullRequest: function(pull) {
+    if (!pull.head || !pull.head.repo) {
+      this.log.error('Skipping pull request, invalid payload given', { number: pull.number, repo: pull.repo });
+      return;
+    }
 
-      var new_pull = false,
-      ssh_url = pull.head.repo.ssh_url,
-      branch = pull.head.label.split(':')[1];
-
-      if (!item) {
-        new_pull = true;
-        self.application.db.insertPull(pull, function(err) {
-          if (err) {
-            self.log.error(err);
-            process.exit(1);
-          }
-        });
-        pull.jobs = [];
-      }
-      else {
-        // Before updating the list of files in db we need to make sure the set of reported lines is saved
-        item.files.forEach(function(file) {
-          pull.files.forEach(function(pull_file, i) {
-            if (pull_file.filename === file.filename) {
-              pull.files[i].reported = file.reported;
-            }
-          });
-        });
-        self.application.db.updatePull(pull.number, pull.repo, { files: pull.files });
-        pull.jobs = item.jobs;
-      }
-
-      if (new_pull || pull.head.sha !== item.head) {
-        self.publish('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
-        return;
-      }
-
-      if (typeof pull.skip_comments !== 'undefined' && pull.skip_comments) {
-        self.publish('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
-        return;
-      }
-
-      self._api.issues.getComments({
-        user: self.config.user,
-        repo: pull.repo,
-        number: pull.number,
-        per_page: 100
-      },
-      function(error, resp) {
-        for (var i in resp) {
-          if (i === 'meta') {
-            continue;
-          }
-
-          var comment = resp[i];
-          if (
-            self.config.retry_whitelist &&
-              self.config.retry_whitelist.indexOf(comment.user.login) === -1 &&
-                comment.user.login !== pull.head.user.login
-          ) {
-            continue;
-          }
-
-          if (comment.created_at > item.updated_at && comment.body.indexOf('@' + self.config.auth.username + ' retest') !== -1) {
-            self.publish('pull.processed', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
-            return;
-          }
-        }
-      });
-    });
+    // pull.issue_comment: internally modified
+    // a "@user retest" comment was found
+    if (pull.head.sha !== pull.head.sha || pull.issue_comment) {
+      this.publish('pull_request.updated', pull);
+      return;
+    }
   },
 
   /**
@@ -351,22 +287,20 @@ module.exports = require('nbd/Class').extend({
       var base_repo_name = pull.pull_request.base.repo.name;
 
       if (pull.action === 'closed') {
-        this.application.db.updatePull(pull.number, base_repo_name, { status: pull.action });
+        this.publish('pull_request.closed', pull);
         if (pull.pull_request.merged) {
           this.log.debug('pull was merged, skipping');
-          this.publish('pull.merged', pull);
-          this.application.db.updatePull(pull.number, base_repo_name, { status: 'merged' });
+          this.publish('pull_request.merged', pull);
         }
         else {
           this.log.debug('pull was closed, skipping');
-          this.publish('pull.closed', pull);
         }
 
         return;
       }
 
       if (pull.action !== 'synchronize' && pull.action !== 'opened') {
-        this.log.debug('Not building pull request, action not supported', { pull_number: pull.number, action: pull.action });
+        this.log.debug('Ignoring pull request, action not supported', { pull_number: pull.number, action: pull.action });
         return;
       }
 
@@ -377,12 +311,12 @@ module.exports = require('nbd/Class').extend({
     // In that case we want to allow the build to be attempted. We only want to prevent it when
     // the mergeable flag is explicitly set to false.
     if (pull.mergeable !== undefined && pull.mergeable === false) {
-      this.log.debug('Not building pull request, not in mergeable state', { pull_number: pull.number, mergeable: pull.mergeable });
+      this.log.debug('Ignoring pull request, not in mergeable state', { pull_number: pull.number, mergeable: pull.mergeable });
       return;
     }
 
     if (pull.body && pull.body.indexOf('@' + this.config.user + ' ignore') !== -1) {
-      this.log.debug('Not building pull request, flagged to be ignored', { pull_number: pull.number });
+      this.log.debug('Ignoring pull request, flagged to be ignored', { pull_number: pull.number });
       return;
     }
 
@@ -390,7 +324,7 @@ module.exports = require('nbd/Class').extend({
     if (this.config.skip_file_listing) {
       this.log.debug('skipping file listing for PR');
       pull.files = [];
-      this.publish('pull.found', pull);
+      this.publish('pull_request.validated', pull);
     }
     else {
       this.checkFiles(pull);
@@ -421,7 +355,7 @@ module.exports = require('nbd/Class').extend({
       number: comment.issue.number
     })
     .then(function(pull) {
-      pull.skip_comments = true;
+      pull.issue_comment = true;
       this.publish('pull_request', pull);
     }.bind(this))
     .catch(this.error);
@@ -433,36 +367,20 @@ module.exports = require('nbd/Class').extend({
    * @method handlePush
    * @param payload {Object}
    */
-  handlePush: function(payload) {
+  handlePush: function(push) {
     var self = this;
 
-    if (!payload.repository.name || !payload.ref || !payload.before || !payload.after || !payload.pusher.name || !payload.pusher.email) {
-      self.log.error('Invalid push payload event', payload);
+    if (!payload.repository.name ||
+        !payload.ref ||
+        !payload.before ||
+        !payload.after ||
+        !payload.pusher.name ||
+        !payload.pusher.email) {
+      this.log.error('Invalid push payload event', payload);
       return;
     }
 
-    self.application.db.findPush(payload.repository.name, payload.ref, payload.after, function(err, item) {
-      var log_item = { repo: payload.repository.name, ref: payload.ref, sha: payload.after };
-
-      if (err) {
-        self.log.error(err);
-        return;
-      }
-
-      if (item) {
-        self.log.debug('Push event already triggered.', log_item);
-        return;
-      }
-
-      self.log.debug('Push event found', log_item);
-      self.application.db.insertPush(payload, function(err, res) {
-        if (err) {
-          self.log.error(err);
-          return;
-        }
-        self.publish('push.found', payload);
-      });
-    });
+    this.publish('push.validated', push);
   },
 
   /**
