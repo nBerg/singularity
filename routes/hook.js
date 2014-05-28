@@ -55,7 +55,7 @@ function githubEvent(request) {
     var data;
 
     try {
-      data = JSON.parse(request.body);
+      data = JSON.parse(JSON.stringify(request.body));
     }
     catch(err) {
       throw {
