@@ -11,9 +11,8 @@ app.use(flatiron.plugins.http);
 var singularity = require('./libraries/singularity'),
 pushChain = [
   {channel: 'github', topic: 'push', plugin: 'github', callback: 'handlePush'},
-  {channel: 'github', topic: 'push.lookup', plugin: 'db', callback: 'findPush'},
-  {channel: 'db', topic: 'push.found', plugin: 'github', callback: 'processPush'},
-  {channel: 'github', topic: 'push.validated', plugin: 'jenkins', callback: 'buildPush'},
+  {channel: 'github', topic: 'push.validated', plugin: 'db', callback: 'findPush'},
+  {channel: 'db', topic: 'push.not_found', plugin: 'jenkins', callback: 'buildPush'},
   {channel: 'jenkins', topic: 'push.triggered', plugin: 'db', callback: 'insertPush'}
 ],
 
@@ -25,7 +24,6 @@ pullChain = [
 
   // see if we contain a record of this PR & process if we have it on record
   {channel: 'db', topic: 'pull_request.found', plugin: 'github', callback: 'processPullRequest'},
-
   // pull_request on record - update stored PR fields
   {channel: 'github', topic: 'pull_request.updated', plugin: 'db', callback: 'updatePullRequest'},
   // otherwise, just insert
