@@ -1,14 +1,20 @@
 "use strict";
 
+var postal = require('postal'),
+channel;
+
 module.exports = require('nbd/Class').extend({
-  publisher: null,
+
+  setChannel: function(channelName) {
+    channel = postal.channel(channelName);
+  },
 
   publish: function(topic, data) {
-    if (!this.publisher) {
-      this.error('cannot publish topic, no channel', arguments);
+    if (!channel) {
+      this.error('cannot publish topic, no channel - ' + topic);
       return;
     }
-    this.publisher(topic, data);
+    channel.publish(topic, data);
   },
 
   init: function(option) {

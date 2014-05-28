@@ -1,6 +1,4 @@
-var Class = require('nbd/Class'),
-    q = require('q'),
-    db = require('./db'),
+var q = require('q'),
     app = require('flatiron').app,
     fs = require('fs'),
     path = require('path'),
@@ -136,7 +134,7 @@ function createSubscriptions(events) {
   });
 }
 
-var Singularity = Class.extend({
+var Singularity = require('nbd/Class').extend({
   init: function() {
     var defaultConfig = standardizeConfig({
       port: 8080,
@@ -198,8 +196,7 @@ var Singularity = Class.extend({
 
           plugin.name = pluginName;
           app.use(plugin, appCfg);
-
-          plugin.publish = postal.channel(pluginName).publish;
+          app[pluginName].setChannel(pluginName);
 
           postal.subscribe({
             channel: pluginName,
@@ -209,7 +206,7 @@ var Singularity = Class.extend({
             }.bind(this)
           });
 
-          plugin.publish('plugged_in', pluginName);
+          app[pluginName].publish('plugged_in', pluginName);
        }.bind(this));
      }.bind(this))
      .catch(this.error)
