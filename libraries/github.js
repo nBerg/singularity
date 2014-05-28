@@ -351,15 +351,16 @@ module.exports = require('./plugin_base').extend({
    * @param payload {Object}
    */
   handlePush: function(push) {
-    var self = this;
-
-    if (!payload.repository.name ||
-        !payload.ref ||
-        !payload.before ||
-        !payload.after ||
-        !payload.pusher.name ||
-        !payload.pusher.email) {
-      this.log.error('Invalid push payload event', payload);
+    if (!push.repository ||
+        !push.repository.name ||
+        !push.ref ||
+        !push.before ||
+        !push.after ||
+        !push.pusher ||
+        !push.pusher.name ||
+        !push.pusher.email) {
+      console.log('bad');
+      this.error('Invalid push payload event', payload);
       return;
     }
 
