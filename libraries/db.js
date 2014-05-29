@@ -1,154 +1,192 @@
 "use strict";
 
-/**
- * All callbacks must have 2 args, err & item
- */
-exports.init = function(config, log) {
+var q = require('q'),
+fs = require('fs'),
+insertionStatuses = ['ignored', 'updated', 'stored'],
+client;
 
-  if (!config) {
-    return null;
+function buildPushQuery(push) {
+  if (!push.repository) {
+    throw 'Push missing repository';
   }
 
-  var MongoDB = function() {
-    this.config = config;
-    this.connection = require('mongojs').connect(config.auth, config.collections);
-    this.connection.pulls.ensureIndex({number: 1, repo_id: 1 }, { unique: true, sparse: true }, function(err, res) {
-      if (err) {
-        log.error('db.pulls: failed to ensure indices', err);
-        process.exit(1);
-      }
-      log.info('db.pulls: ensured indices', { indices: res });
-    });
+  if (!push.repository.name) {
+    throw 'Push missing repository name';
+  }
 
-    this.connection.createCollection('config');
+  if (!push.repository.organization) {
+    throw 'Push missing repository name';
+  }
+
+  if (!push.ref) {
+    throw 'Push missing ref';
+  }
+
+  if (!push.after) {
+    throw 'Push missing after SHA';
+  }
+
+  return {
+    ref: push.ref,
+    sha: push.after,
+    repo: push.repository.organization + '/' + push.repository.name
+  };
+}
+
+function buildPushRecord(push) {
+  var record = buildPushQuery(push);
+  record.job = {
+    id: null,
+    result: null,
+    status: null
   };
 
-  MongoDB.prototype.saveSingularityConfig = function(config, callback) {
-    this.connection.config.remove({}, function(err) {
-      if (err) {
-        log.error('failed to update config', err);
-        return;
-      }
-    });
-    this.connection.config.insert(config, callback);
+  return record;
+}
+
+function buildPullQuery(pull) {
+  if (!pull.number) {
+    throw 'missing PR number';
+  }
+  if (!pull.base || !pull.base.repo || !pull.base.repo.full_name) {
+    throw 'invalid PR base';
+  }
+  return {
+    number: pull.number,
+    repo: pull.base.repo.full_name
   };
+}
 
-  MongoDB.prototype.getSingularityConfig = function(callback) {
-    this.connection.config.findOne({}, callback);
-  };
+function buildPullRecord(pull) {
 
-  MongoDB.prototype.insertMerge = function(merge, callback) {
-    this.connection.merges.insert({
-      organization: merge.organization,
-      repo: merge.repo,
-      number: merge.number,
-      merger: merge.merger,
-      result: merge.result
-    }, callback);
-  };
+}
 
-  MongoDB.prototype.findPush = function(repo, ref, head, callback) {
-    this.connection.pushes.findOne({ repo: repo, ref: ref, sha: head }, callback);
-  };
+function getClient() {
+  if (client) {
+    return client;
+  }
+  throw 'No client - error connecting on startup? Incorrect configuration?';
+}
 
-  MongoDB.prototype.insertPush = function(push, callback) {
-    this.connection.pushes.insert({
-      repo: push.repository.name,
-      ref: push.ref,
-      sha: push.after,
-    }, callback);
-  };
+module.exports = require('./vent').extend({
+  init: function(option) {
+    // TODO: think about putting this into vent instead
+    option = require('nconf').defaults(option);
+    this._super(option);
+  },
 
-  MongoDB.prototype.findPull = function(pull_number, pull_repo, callback) {
-    this.connection.pulls.findOne({ number: pull_number, repo: pull_repo }, callback);
-  };
-
-  MongoDB.prototype.findPullByRepoId = function(pull_number, pull_repo_id, callback) {
-    pull_number = parseInt(pull_number);
-    pull_repo_id = parseInt(pull_repo_id);
-    this.connection.pulls.findOne({ number: pull_number, repo_id: pull_repo_id }, callback);
-  };
-
-  MongoDB.prototype.updatePull = function(pull_number, pull_repo, update_columns) {
-    this.connection.pulls.update({ number: pull_number, repo: pull_repo }, { $set: update_columns });
-  };
-
-  MongoDB.prototype.insertPull = function(pull, callback) {
-    this.connection.pulls.insert({
-      number: pull.number,
-      repo_id: pull.base.repo.id,
-      repo: pull.repo,
-      created_at: pull.created_at,
-      updated_at: pull.updated_at,
-      head: pull.head.sha,
-      merged: false,
-      status: 'open',
-      merge_result: null,
-      files: pull.files,
-      opening_event: pull
-    }, callback);
-  };
-
-  MongoDB.prototype.findRepoPullsByStatuses = function(params, callback) {
-    var limit = parseInt(params.limit) || 8,
-        repo = parseInt(params.repo),
-        sort = params.sort && ('ascending' === params.sort) ? 1 : -1,
-        statuses = params.statuses ? params.statuses.split(',') : ['open'];
-
-    if (!!!repo) {
-      callback('no repo given, or invalid value', null);
+  setClient: function(client) {
+    if (!this.config.get(client)) {
+      this.log.error('No config for db.<client>, ignoring', {client: client});
       return;
     }
 
-    this.connection.pulls.find({ repo_id: repo, status: { $in: statuses } }).sort([['_id', sort]]).limit(limit, callback);
-  };
+    var clientPath = this.config.get('client_path') || (__dirname + '/db/' + client + '.js');
+    if (fs.existsSync(clientPath)) {
+      var ClientObj = require(clientPath);
 
-  MongoDB.prototype.findByJobStatus = function(statuses, callback) {
-    this.connection.pulls.find({ 'jobs.status': { $in: statuses }}).forEach(callback);
-  };
+      q.fcall(function() {
+        return new ClientObj(this.config.get(client));
+      }.bind(this))
+      .then(function(instance) {
+        client = instance;
+      })
+      .catch(this.log.error)
+      .done();
 
-  MongoDB.prototype.findPushJobsByStatus = function(statuses, callback) {
-    this.connection.pushes.find({ 'job.status': { $in: statuses } }).forEach(callback);
-  };
-
-  MongoDB.prototype.insertJob = function(pull, job) {
-    if (typeof pull.jobs === 'undefined') {
-      pull.jobs = [];
+      return;
     }
 
-    pull.jobs.push(job);
+    this.log.error(clientPath + ' does not exist, ignoring');
+  },
 
-    this.updatePull(pull.number, pull.repo, { jobs: pull.jobs});
-  };
+  insertPush: function(push) {
+    var self = this;
 
-  MongoDB.prototype.insertPushJob = function(push, job_id) {
-    var query = {
-      ref: push.ref,
-      repo: push.repository.name,
-      sha: push.after
-    };
-    this.findPush(push.repository.name, push.ref, push.after, function(err, res) {
-      // something went terribly wrong, SHOULD die
-      if (err) {
-        log.error('failed to insert a push job', err);
-        process.exit(1);
-      }
+    return q.fcall(getClient)
+    .thenResolve(push)
+    .then(buildPushRecord)
+    .then(function(record) {
+      return client.insertPush(record)
+      .then(function(res) {
+        // pushes should be unique so the system should consider push.*stored
+        // as a binary event
+        self.publish((res) ? 'push.stored' : 'push.not_stored', push);
+      })
+      .catch(self.error)
+      .done();
+    })
+    .catch(self.error)
+    .done();
+  },
 
-      this.connection.pushes.update(query, { $set: { 'job.id': job_id, 'job.result': 'BUILDING', 'job.status': 'new' } });
-    }.bind(this));
-  };
+  findPush: function(push) {
+    var self = this;
 
-  MongoDB.prototype.updatePushJobStatus = function(job_id, status, result) {
-    this.connection.pushes.update({ 'job.id': job_id }, { $set: { 'job.status': status, 'job.result': result }});
-  };
+    return q.fcall(getClient)
+    .thenResolve(push)
+    .then(buildPushQuery)
+    .then(function(query) {
+      return client.findPush(query)
+      .then(function(item) {
+        self.publish((item) ? 'push.found' : 'push.not_found', push);
+      })
+      .catch(self.error)
+      .done();
+    })
+    .catch(self.error)
+    .done();
+  },
 
-  MongoDB.prototype.updatePRJobStatus = function(job_id, status, result) {
-    this.connection.pulls.update({ 'jobs.id': job_id }, { $set: { 'jobs.$.status': status, 'jobs.$.result': result }});
-  };
+  insertPull: function(pull) {
+    var self = this;
 
-  MongoDB.prototype.insertLineStatus = function(pull, filename, line_number) {
-    this.connection.pulls.update({ _id: pull.number, 'files.filename': filename }, { $push: { 'files.$.reported': line_number } });
-  };
+    return q.fcall(getClient)
+    .thenResolve(pull)
+    .then(buildPullRecord)
+    .then(function(record) {
+      return client.insertPull(record)
+      .then(function(res) {
+        if (!!~insertionStatuses.indexOf(res)) {
+          self.publish('pull_request.' + res, pull);
+          return;
+        }
 
-  return new MongoDB();
-};
+        // -1 means (to us) that nothing happened
+        if (!~res) {
+          self.publish('pull_request.not_stored', pull);
+          return;
+        }
+        // >= 1 means that something was inserted
+        if (res) {
+          self.publish('pull_request.stored', pull);
+          return;
+        }
+        // 0 means that something happened, but nothing was added
+        self.publish('pull_request.updated', pull);
+      })
+      .catch(self.error)
+      .done();
+    })
+    .catch(self.error)
+    .done();
+  },
+
+  findPull: function(pull) {
+    var self = this;
+
+    return q.fcall(getClient)
+    .thenResolve(pull)
+    .then(buildPullQuery)
+    .then(function(query) {
+      return client.findPush(query)
+      .then(function(item) {
+        self.publish((item) ? 'pull_request.found' : 'pull_request.not_found', pull);
+      })
+      .catch(self.error)
+      .done();
+    })
+    .catch(self.error)
+    .done();
+  }
+});
