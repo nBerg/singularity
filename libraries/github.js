@@ -4,7 +4,7 @@ var GitHubApi = require('github'),
 async = require('async'),
 q = require('q');
 
-module.exports = require('./plugin_base').extend({
+module.exports = require('./vent').extend({
   init: function(option) {
     this._super(option);
     this._api = new GitHubApi({
@@ -359,7 +359,6 @@ module.exports = require('./plugin_base').extend({
         !push.pusher ||
         !push.pusher.name ||
         !push.pusher.email) {
-      console.log('bad');
       this.error('Invalid push payload event', payload);
       return;
     }

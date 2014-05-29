@@ -123,7 +123,7 @@ function validateSubscriptions(events) {
 
 function createSubscriptions(events) {
   events.forEach(function(event) {
-    app.log.info('Embrace perfection.', event);
+    app.log.get('console').debug('Assuming direct control.', event);
 
     var channelObj = postal.channel(event.channel),
     callback = function(data, envelope) {
@@ -147,8 +147,7 @@ var Singularity = require('nbd/Class').extend({
     });
     app.config.defaults(defaultConfig);
     app.init();
-
-    this.log = app.log;
+    this.log = app.log.get('console');
   },
 
   createChannelEventChain: function(chain) {
@@ -188,7 +187,7 @@ var Singularity = require('nbd/Class').extend({
               appCfg = app.config.get(pluginName);
 
           if (!filename.match(/\.js$/) || !appCfg || appCfg.disabled) {
-            this.log.info('The dead are useless.', { name: pluginName });
+            this.log.debug('Ignore the fallen.', { name: pluginName });
             return;
           }
 
@@ -197,16 +196,17 @@ var Singularity = require('nbd/Class').extend({
           plugin.name = pluginName;
           app.use(plugin, appCfg);
           app[pluginName].setChannel(pluginName);
+          app[pluginName].name = pluginName;
 
           postal.subscribe({
             channel: pluginName,
-            topic: 'plugged_in',
+            topic: 'i_am_harbinger',
             callback: function(data, envelope) {
-              this.log.info('Assuming direct control.', arguments);
+              this.log.debug('We are Harbinger.', arguments);
             }.bind(this)
           });
 
-          app[pluginName].publish('plugged_in', pluginName);
+          app[pluginName].publish('i_am_harbinger', pluginName);
        }.bind(this));
      }.bind(this))
      .catch(this.error)
