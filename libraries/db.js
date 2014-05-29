@@ -65,7 +65,7 @@ function getClient() {
   if (client) {
     return client;
   }
-  throw 'No client - error connecting on startup? Incorrect configuration?';
+  throw 'No DB client - error connecting on startup? Incorrect configuration?';
 }
 
 module.exports = require('./vent').extend({
