@@ -10,34 +10,34 @@ app.use(flatiron.plugins.http);
 
 var singularity = require('./libraries/singularity'),
 pushChain = [
-  {channel: 'github', topic: 'push', plugin: 'github', callback: 'handlePush'},
-  {channel: 'github', topic: 'push.validated', plugin: 'db', callback: 'findPush'},
-  {channel: 'db', topic: 'push.not_found', plugin: 'jenkins', callback: 'buildPush'},
-  {channel: 'jenkins', topic: 'push.triggered', plugin: 'db', callback: 'insertPush'}
+  {channel: 'github', topic: 'push', vent: 'github', callback: 'handlePush'},
+  {channel: 'github', topic: 'push.validated', vent: 'db', callback: 'findPush'},
+  {channel: 'db', topic: 'push.not_found', vent: 'jenkins', callback: 'buildPush'},
+  {channel: 'jenkins', topic: 'push.triggered', vent: 'db', callback: 'insertPush'}
 ],
 
 pullChain = [
   // incoming from *some* source (hook, issue_comment, w/e) & then validate that this is a payload
   // that we should trigger a build for
-  {channel: 'github', topic: 'pull_request', plugin: 'github', callback: 'handlePullRequest'},
-  {channel: 'github', topic: 'pull_request.validated', plugin: 'db', callback: 'findPullRequest'},
+  {channel: 'github', topic: 'pull_request', vent: 'github', callback: 'handlePullRequest'},
+  {channel: 'github', topic: 'pull_request.validated', vent: 'db', callback: 'findPullRequest'},
 
   // see if we contain a record of this PR & process if we have it on record
-  {channel: 'db', topic: 'pull_request.found', plugin: 'github', callback: 'processPullRequest'},
+  {channel: 'db', topic: 'pull_request.found', vent: 'github', callback: 'processPullRequest'},
   // pull_request on record - update stored PR fields
-  {channel: 'github', topic: 'pull_request.updated', plugin: 'db', callback: 'updatePullRequest'},
+  {channel: 'github', topic: 'pull_request.updated', vent: 'db', callback: 'updatePullRequest'},
   // otherwise, just insert
-  {channel: 'db', topic: 'pull_request.not_found', plugin: 'db', callback: 'insertPullRequest'},
+  {channel: 'db', topic: 'pull_request.not_found', vent: 'db', callback: 'insertPullRequest'},
 
   // regardless of whether the PR was new (stored) or updated, trigger a build
-  {channel: 'db', topic: 'pull_request.updated', plugin: 'jenkins', callback: 'buildPullRequest'},
-  {channel: 'db', topic: 'pull_request.stored', plugin: 'jenkins', callback: 'buildPullRequest'},
+  {channel: 'db', topic: 'pull_request.updated', vent: 'jenkins', callback: 'buildPullRequest'},
+  {channel: 'db', topic: 'pull_request.stored', vent: 'jenkins', callback: 'buildPullRequest'},
 
   // store data on the triggered job
-  {channel: 'jenkins', topic: 'pull_request.triggered', plugin: 'db', callback: 'insertPullRequestJob'},
+  {channel: 'jenkins', topic: 'pull_request.triggered', vent: 'db', callback: 'insertPullRequestJob'},
 
   // once stored, create a status
-  {channel: 'db', topic: 'pull_request.build.stored', plugin: 'github', callback: 'createStatus'}
+  {channel: 'db', topic: 'pull_request.build.stored', vent: 'github', callback: 'createStatus'}
 ],
 
 commentChain = [
@@ -45,12 +45,12 @@ commentChain = [
   // equivalent to the `pullChain`
   // i.e.: `handleIssueComment()` must publish data that is isometric to a regular pull_request
   //       event payload
-  { channel: 'github', topic: 'issue_comment', plugin: 'github', callback: 'handleIssueComment' }
+  { channel: 'github', topic: 'issue_comment', vent: 'github', callback: 'handleIssueComment' }
 ],
 
 configEvents = [
-  { channel: 'github', topic: 'config', plugin: 'github', callback: 'addRepo' },
-  { channel: 'jenkins', topic: 'config', plugin: 'jenkins', callback: 'addProject' },
+  { channel: 'github', topic: 'config', vent: 'github', callback: 'addRepo' },
+  { channel: 'jenkins', topic: 'config', vent: 'jenkins', callback: 'addProject' },
 ],
 
 server = app.start(app.config.get('port'), function() {

@@ -111,7 +111,7 @@ function validateSubscriptions(events) {
       throw 'events must be an array';
     }
     events.forEach(function validateEvent(event) {
-      ['channel', 'topic', 'plugin', 'callback'].forEach(function(param) {
+      ['channel', 'topic', 'vent', 'callback'].forEach(function(param) {
         if (!event[param]) {
           throw 'missing param "' + param + '" in ' + JSON.stringify(event);
         }
@@ -127,7 +127,8 @@ function createSubscriptions(events) {
 
     var channelObj = postal.channel(event.channel),
     callback = function(data, envelope) {
-      app[event.plugin][event.callback](data);
+      app.log.get('console').debug('[channel.topic -> vent.callback]', event);
+      app[event.vent][event.callback](data);
     };
 
     channelObj.subscribe(event.topic, callback);
