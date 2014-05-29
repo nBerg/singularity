@@ -2,16 +2,15 @@
 
 var mongojs = require('mongojs'),
 q = require('q'),
-collections = ['pulls', 'pushes', 'config'];
+collections = ['pulls', 'pushes', 'config'],
+dbConnection;
 
 function ensureIndices(connection) {
   var indices = { number: 1, repo_id: 1 },
   options = { unique: true, sparse: true };
 
   return q.ninvoke(connection.pulls, 'ensureIndex', indices, options)
-  .then(function(res) {
-    return connection;
-  })
+  .thenResolve(connection)
   .catch(function(err) {
     throw 'db.pulls: failed to ensure indices;' + JSON.stringify({ error: err });
   });
@@ -25,19 +24,19 @@ module.exports = require('nbd/Class').extend({
       throw 'mongo: no auth config given';
     }
 
-    q.ninvoke(mongojs, 'connect', option.auth, collections)
+    q(mongojs.connect(option.auth, collections))
     .then(ensureIndices)
     .done(function(connection) {
-      this.connection = connection;
-    }.bind(this));
+      dbConnection = connection;
+    });
   },
 
   findPush: function(query) {
-    return q.ninvoke(this.connection.pushes, 'findOne', query);
+    return q.ninvoke(dbConnection.pushes, 'findOne', query);
   },
 
   findPull: function(query) {
-    return q.ninvoke(this.connection.pulls, 'findOne', query);
+    return q.ninvoke(dbConnection.pulls, 'findOne', query);
   }
 });
 

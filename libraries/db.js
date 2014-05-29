@@ -3,7 +3,7 @@
 var q = require('q'),
 fs = require('fs'),
 insertionStatuses = ['ignored', 'updated', 'stored'],
-client;
+clientConnection;
 
 function buildPushQuery(push) {
   if (!push.repository) {
@@ -62,8 +62,8 @@ function buildPullRecord(pull) {
 }
 
 function getClient() {
-  if (client) {
-    return client;
+  if (clientConnection) {
+    return clientConnection;
   }
   throw 'No DB client - error connecting on startup? Incorrect configuration?';
 }
@@ -89,7 +89,7 @@ module.exports = require('./vent').extend({
         return new ClientObj(this.config.get(client));
       }.bind(this))
       .then(function(instance) {
-        client = instance;
+        clientConnection = instance;
       })
       .catch(this.log.error)
       .done();
@@ -107,7 +107,7 @@ module.exports = require('./vent').extend({
     .thenResolve(push)
     .then(buildPushRecord)
     .then(function(record) {
-      return client.insertPush(record)
+      return clientConnection.insertPush(record)
       .then(function(res) {
         // pushes should be unique so the system should consider push.*stored
         // as a binary event
@@ -127,7 +127,7 @@ module.exports = require('./vent').extend({
     .thenResolve(push)
     .then(buildPushQuery)
     .then(function(query) {
-      return client.findPush(query)
+      return clientConnection.findPush(query)
       .then(function(item) {
         self.publish((item) ? 'push.found' : 'push.not_found', push);
       })
