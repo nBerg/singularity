@@ -6,7 +6,7 @@ function addRepoPRJob(request) {
           message: 'missing parameter: ' + param
         },
         status: 400
-      }
+      };
     }
   });
 

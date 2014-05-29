@@ -24,10 +24,10 @@ module.exports = require('./vent').extend({
       this.config.repos = [];
     }
 
-    this.log.info('GitHub Lib: adding repo', repo);
-    this.config.repos.push(repo);
+    this.log.info('GitHub Lib: adding repo', data.repo);
+    this.config.repos.push(data.repo);
 
-    return this.setupRepoHook(repo);
+    return this.setupRepoHook(data.repo);
   },
 
   /**
@@ -267,8 +267,6 @@ module.exports = require('./vent').extend({
   handlePullRequest: function(pull) {
     // Check if this came through a webhooks setup
     if (pull.action !== undefined) {
-      var base_repo_name = pull.pull_request.base.repo.name;
-
       if (pull.action === 'closed') {
         this.publish('pull_request.closed', pull);
         if (pull.pull_request.merged) {
@@ -359,7 +357,7 @@ module.exports = require('./vent').extend({
         !push.pusher ||
         !push.pusher.name ||
         !push.pusher.email) {
-      this.error('Invalid push payload event', payload);
+      this.error('Invalid push payload event', push);
       return;
     }
 

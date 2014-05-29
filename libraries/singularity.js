@@ -29,7 +29,7 @@ function packageMeta(meta) {
   return q.fcall(function() {
     return Object.keys(meta).filter(function(field) {
       return !~['body', 'status'].indexOf(field);
-    })
+    });
   })
   .then(function(metaFields) {
     var envelopes = [];
@@ -164,7 +164,6 @@ var Singularity = require('nbd/Class').extend({
     Object.keys(routes)
     .forEach(function(path) {
       var route = routes[path],
-      self = this,
       routerArgs = [
         route.method || 'get',
         path,
