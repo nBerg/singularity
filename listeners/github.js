@@ -85,8 +85,28 @@ var GitHub = function(config, application, events) {
     self.handlePullRequest(pull);
   });
 
+  self.application.on('pull.comment', function(meta) {
+    self.commentOnPr(meta);
+  });
+
   self.events.on('pull_request', function(pull) {
     self.handlePullRequest(pull);
+  });
+};
+
+GitHub.prototype.commentOnPr = function(meta) {
+  var self = this;
+  self.api.issues.createComment({
+    user: meta.organization,
+    repo: meta.repo,
+    number: meta.pull_request,
+    body: meta.message
+  },
+  function(err, res) {
+    if (err) {
+      self.log.error('error while creating comment', err);
+      return;
+    }
   });
 };
 
