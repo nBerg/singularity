@@ -101,7 +101,6 @@ Jenkins.prototype.findProjectByRepo = function(repo) {
 Jenkins.prototype.start = function() {
   if (!this.application.db) {
     this.application.log.error('Jenkins Listener: missing app db... (╯°□°）╯︵ ┻━┻');
-    this.gatherCommentResults('mergeatron-be.net', { number: 1504 });
     return this;
   }
 
@@ -405,27 +404,22 @@ Jenkins.prototype.checkPRJob = function(pull) {
     self.application.db.updatePRJobStatus(job.id, 'finished', build.result);
 
     if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
-      self.gatherCommentResults(project.name, build);
+      self.gatherPRComments(project.name, build);
       self.processArtifacts(project.name, build, pull);
     }
   });
 };
 
-/**
- * @method gatherCommentResults
- * @param project_name {String}
- * @param build {Object}
- */
-Jenkins.prototype.gatherCommentResults = function(job_name, build) {
-  var self = this,
-      options = {
-        url: url.format({
-          protocol: this.config.protocol,
-          host: this.config.host,
-          pathname: '/job/' + job_name + '/' + build.number + '/injectedEnvVars/api/json'
-        }),
-        json: true
-      };
+Jenkins.prototype.getJobEnv = function(job_name, build) {
+  var defer = Q.defer(),
+  options = {
+    url: url.format({
+      protocol: this.config.protocol,
+      host: this.config.host,
+      pathname: '/job/' + job_name + '/' + build.number + '/injectedEnvVars/api/json'
+    }),
+    json: true
+  };
 
   if (this.config.user && this.config.pass) {
     options.headers = {
@@ -433,27 +427,42 @@ Jenkins.prototype.gatherCommentResults = function(job_name, build) {
     };
   }
 
-  var defer = Q.defer();
-
-  self.request(options, function(err, response, body) {
+  this.request(options, function(err, response, body) {
     if (err) {
       defer.reject(err);
       return;
     }
-
-    var message = 'Build ' + build.fullDisplayName + ' ' + build.result + '. ';
-
-    if (build.result === 'FAILURE') {
-      if (body.envMap && body.envMap.SINGULARITY_FAILURE) {
-        message += body.envMap.SINGULARITY_FAILURE;
-      }
+    if (!body.envMap) {
+      defer.reject('Inspected build did not have envMap field');
+      return;
     }
-
-    self.application.emit('build.comment', message);
-    self.application.log.info('build comment', { message: message });
+    defer.resolve(body.envMap);
   });
 
   return defer.promise;
+};
+
+/**
+ * @method gatherPRComments
+ * @param project_name {String}
+ * @param build {Object}
+ */
+Jenkins.prototype.gatherPRComments = function(job_name, build) {
+  var self = this;
+
+  return this.getJobEnv(job_name, build)
+  .then(function(envMap) {
+    var message = 'Build ' + build.fullDisplayName + ' ' + build.result + '. ';
+    if (build.result === 'FAILURE') {
+      if (envMap.SINGULARITY_FAILURE) {
+        message += envMap.SINGULARITY_FAILURE;
+      }
+    }
+    self.application.emit('pull.comment', message);
+    self.application.log.debug('pull comment', { message: message });
+  })
+  .catch(self.application.log.error)
+  .done();
 };
 
 /**

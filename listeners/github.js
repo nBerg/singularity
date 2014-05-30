@@ -73,6 +73,10 @@ var GitHub = function(config, application, events) {
     self.createComment(pull, comment);
   });
 
+  self.application.on('pull.comment', function(pull, comment) {
+    self.commentOnPull(pull, comment);
+  });
+
   self.application.on('issue_comment', function(data) {
     self.handleIssueComment(data);
   });
@@ -357,6 +361,10 @@ GitHub.prototype.createStatus = function(sha, user, repo, state, build_url, desc
   });
 };
 
+GitHub.prototype.commentOnPull = function(pull, comment) {
+  var blah;
+};
+
 /**
  * Uses the GitHub API to create an inline comment on the diff of a pull request.
  *
@@ -462,7 +470,9 @@ GitHub.prototype.handleIssueComment = function(comment) {
     return;
   }
 
-  if (comment.comment.body.indexOf('@' + this.config.auth.username + ' retest') !== -1) {
+  if (!~comment.comment.body.indexOf('@' + this.config.auth.username + ' retest') ||
+      !~comment.comment.body.indexOf('@' + this.config.auth.username + ' judge me') ||
+      !~comment.comment.body.indexOf('@' + this.config.auth.username + ' murder')) {
     this.application.log.debug('Received retest request for pull', { pull_number: comment.issue.number, repo: comment.repository.name });
 
     var self = this;
