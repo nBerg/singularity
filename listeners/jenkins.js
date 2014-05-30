@@ -404,7 +404,7 @@ Jenkins.prototype.checkPRJob = function(pull) {
     self.application.db.updatePRJobStatus(job.id, 'finished', build.result);
 
     if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
-      self.gatherPRComments(project.name, build);
+      self.gatherPRComments(pull, project.name, build);
       self.processArtifacts(project.name, build, pull);
     }
   });
@@ -447,7 +447,7 @@ Jenkins.prototype.getJobEnv = function(job_name, build) {
  * @param project_name {String}
  * @param build {Object}
  */
-Jenkins.prototype.gatherPRComments = function(job_name, build) {
+Jenkins.prototype.gatherPRComments = function(pull, job_name, build) {
   var self = this;
 
   return this.getJobEnv(job_name, build)
@@ -458,7 +458,7 @@ Jenkins.prototype.gatherPRComments = function(job_name, build) {
         message += envMap.SINGULARITY_FAILURE;
       }
     }
-    self.application.emit('pull.comment', message);
+    self.application.emit('pull.comment', pull, message);
     self.application.log.debug('pull comment', { message: message });
   })
   .catch(self.application.log.error)
