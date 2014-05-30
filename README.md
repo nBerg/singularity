@@ -32,8 +32,10 @@ npm install
 forever start server.js
 ```
 
+###In Progress!
+- better structuring, routing, refactoring middleware use (moving to Flatiron? Using NBD.js!)
+- NSQ Daemon / Subscribing! So that configuration is even more scalable & that plugins even easier to write.
+
 ###To Come:
 
 - support for multiple organizations
-- better module structuring
-- proper routing / yavascripts (because I'm not a JS dev)
