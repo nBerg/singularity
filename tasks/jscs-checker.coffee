@@ -7,6 +7,7 @@ module.exports = (grunt) =>
 
   grunt.config.set('jscs',
     main: [
+      'plugins/*.js',
       'libraries/*.js',
       'listeners/*.js',
       'routes/*.js',

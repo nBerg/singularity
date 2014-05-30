@@ -31,8 +31,18 @@ module.exports = require('nbd/Class').extend({
     });
   },
 
+  findPendingPushJobs: function() {
+    var query = {'job.status': { $in: ['new', 'started'] }};
+    return q.ninvoke(dbConnection.pushes, 'find', query);
+  },
+
   findPush: function(query) {
     return q.ninvoke(dbConnection.pushes, 'findOne', query);
+  },
+
+  findPendingPullJobs: function() {
+    var query = {'jobs.status': { $in: ['new', 'started'] }};
+    return q.ninvoke(dbConnection.pull, 'find', query);
   },
 
   findPull: function(query) {

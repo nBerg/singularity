@@ -100,6 +100,27 @@ module.exports = require('./vent').extend({
     this.log.error(clientPath + ' does not exist, ignoring');
   },
 
+  findPendingJobs: function() {
+    q.fcall(getClient)
+
+    .then(clientConnection.findPendingPushJobs)
+    .then(function(pulls) {
+      pulls.forEach(function(pull) {
+        this.publish('pull_request.build_pending', pull);
+      }.bind(this));
+    }.bind(this))
+
+    .then(clientConnection.findPendingPullJobs)
+    .then(function(pushes) {
+      pushes.forEach(function(push) {
+        this.publish('push.build_pending', push);
+      }.bind(this));
+    }.bind(this))
+
+    .catch(this.log.error)
+    .done();
+  },
+
   insertPush: function(push) {
     var self = this;
 
@@ -109,11 +130,12 @@ module.exports = require('./vent').extend({
     .then(function(record) {
       return clientConnection.insertPush(record)
       .then(function(res) {
-        // pushes should be unique so the system should consider push.*stored
-        // as a binary event
-        self.publish((res) ? 'push.stored' : 'push.not_stored', push);
+        self.publish('push.stored', push);
       })
-      .catch(self.error)
+      .catch(function(err) {
+        push.error = err;
+        self.publish('push.not_stored', push);
+      })
       .done();
     })
     .catch(self.error)
@@ -145,7 +167,7 @@ module.exports = require('./vent').extend({
     .thenResolve(pull)
     .then(buildPullRecord)
     .then(function(record) {
-      return client.insertPull(record)
+      return clientConnection.insertPull(record)
       .then(function(res) {
         if (!!~insertionStatuses.indexOf(res)) {
           self.publish('pull_request.' + res, pull);
@@ -165,7 +187,10 @@ module.exports = require('./vent').extend({
         // 0 means that something happened, but nothing was added
         self.publish('pull_request.updated', pull);
       })
-      .catch(self.error)
+      .catch(function(err) {
+        pull.error = err;
+        self.publish('pull_request.not_stored', pull);
+      })
       .done();
     })
     .catch(self.error)
@@ -179,7 +204,7 @@ module.exports = require('./vent').extend({
     .thenResolve(pull)
     .then(buildPullQuery)
     .then(function(query) {
-      return client.findPush(query)
+      return clientConnection.findPush(query)
       .then(function(item) {
         self.publish((item) ? 'pull_request.found' : 'pull_request.not_found', pull);
       })

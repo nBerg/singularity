@@ -9,6 +9,7 @@ module.exports = (grunt) =>
     options:
       jshintrc: true
     files: [
+      'plugins/*.js',
       'libraries/*.js',
       'listeners/*.js',
       'routes/*.js',

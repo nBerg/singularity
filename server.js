@@ -36,8 +36,8 @@ pullChain = [
   // store data on the triggered job
   {channel: 'jenkins', topic: 'pull_request.triggered', vent: 'db', callback: 'insertPullRequestJob'},
 
-  // once stored, create a status
-  {channel: 'db', topic: 'pull_request.build.stored', vent: 'github', callback: 'createStatus'}
+  // once stored, create a status - say that the build is starting, no link yet
+  {channel: 'db', topic: 'pull_request.build_stored', vent: 'github', callback: 'createStatus'}
 ],
 
 commentChain = [
@@ -45,12 +45,27 @@ commentChain = [
   // equivalent to the `pullChain`
   // i.e.: `handleIssueComment()` must publish data that is isometric to a regular pull_request
   //       event payload
-  { channel: 'github', topic: 'issue_comment', vent: 'github', callback: 'handleIssueComment' }
+  {channel: 'github', topic: 'issue_comment', vent: 'github', callback: 'handleIssueComment'}
+],
+
+buildChain = [
+  {channel: 'build', topic: 'jobs.polling', vent: 'db', callback: 'findPendingJobs'},
+
+  // previous call should publish events for everything
+  {channel: 'db', topic: 'pull_request.build_pending', vent: 'build', callback: 'checkPullRequestJob'},
+  {channel: 'db', topic: 'push.build_pending', vent: 'build', callback: 'checkPushJob'},
+
+  // job status change - update DB
+  {channel: 'build', topic: 'pull_request.build_updated', vent: 'db', callback: 'updatePullRequestJob'},
+  {channel: 'build', topic: 'push.build_updated', vent: 'db', callback: 'updatePushJob'},
+
+  // pull_request.build.* => build status update in DB that should be written to github
+  {channel: 'db', topic: 'pull_request.build.*', vent: 'github', callback: 'createStatus'}
 ],
 
 configEvents = [
-  { channel: 'github', topic: 'config', vent: 'github', callback: 'addRepo' },
-  { channel: 'jenkins', topic: 'config', vent: 'jenkins', callback: 'addProject' },
+  {channel: 'github', topic: 'config', vent: 'github', callback: 'addRepo'},
+  {channel: 'jenkins', topic: 'config', vent: 'jenkins', callback: 'addProject'}
 ],
 
 server = app.start(app.config.get('port'), function() {
@@ -58,6 +73,7 @@ server = app.start(app.config.get('port'), function() {
 
   singularity.createChannelEventChain(pushChain);
   singularity.createChannelEventChain(pullChain);
+  singularity.createChannelEventChain(buildChain);
   singularity.createChannelEventChain(commentChain);
   singularity.createChannelEventChain(configEvents);
 

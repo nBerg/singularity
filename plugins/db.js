@@ -1,14 +1,14 @@
 "use strict";
 
 var plugin,
-db = require('../libraries/db');
+Db = require('../libraries/db');
 
 // TODO: refactor so that it's easy to swap this out with other DB libs
 module.exports = plugin = {
   name: 'Database',
 
   attach: function(options) {
-    this.db = new db(options);
+    this.db = new Db(options);
     this.db.log = this.log.get('console');
   },
 
