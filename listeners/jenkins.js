@@ -175,11 +175,17 @@ Jenkins.prototype.buildPull = function(pull, number, sha, ssh_url, branch, updat
       return;
     }
 
-    self.application.db.updatePull(number, pull.repo, { head: sha, updated_at: updated_at});
-    self.application.db.insertJob(pull, {
+    var job = {
       id: job_id,
       status: 'new',
+      result: 'BUILDING',
       head: sha
+    };
+
+    self.application.log.debug('Updating PR, inserting job', job);
+    self.application.db.updatePull(number, pull.repo, { head: sha, updated_at: updated_at},
+    function() {
+      self.application.db.insertJob(pull, job);
     });
   });
 };
