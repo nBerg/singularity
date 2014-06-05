@@ -69,8 +69,8 @@ exports.init = function(config, log) {
     this.connection.pulls.findOne({ number: pull_number, repo_id: pull_repo_id }, callback);
   };
 
-  MongoDB.prototype.updatePull = function(pull_number, pull_repo, update_columns) {
-    this.connection.pulls.update({ number: pull_number, repo: pull_repo }, { $set: update_columns });
+  MongoDB.prototype.updatePull = function(pull_number, pull_repo, update_columns, callback) {
+    this.connection.pulls.update({ number: pull_number, repo: pull_repo }, { $set: update_columns }, callback);
   };
 
   MongoDB.prototype.insertPull = function(pull, callback) {
@@ -118,7 +118,7 @@ exports.init = function(config, log) {
 
     pull.jobs.push(job);
 
-    this.updatePull(pull.number, pull.repo, { jobs: pull.jobs});
+    this.updatePull(pull.number, pull.repo, { jobs: pull.jobs });
   };
 
   MongoDB.prototype.insertPushJob = function(push, job_id) {
