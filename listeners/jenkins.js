@@ -257,6 +257,9 @@ Jenkins.prototype.validatePush = function(push) {
  * @param repo {String}
  */
 Jenkins.prototype.findPushProjectForRepo = function(repo) {
+  if (!this.config.push_projects) {
+    return {};
+  }
   return this.config.push_projects.filter(function(project) {
     return project.repo === repo;
   })
