@@ -63,6 +63,25 @@ exports.init = function(config, log) {
     this.connection.pulls.findOne({ number: pull_number, repo: pull_repo }, callback);
   };
 
+ MongoDB.prototype.findPullByID = function(pull_id, callback) {
+    pull_id = parseInt(pull_id),
+
+    // Check for record with new pull_id field
+    this.connection.pulls.findOne({ pull_id: pull_id }, function(err, item) {
+
+      // If not found, check for record with old opening_event.id field
+      if (!item) {
+        log.debug('pull_request with pull_id field for ' + pull_id + ' not found');
+        log.debug('checking using old style opening_event.id field');
+        this.connection.pulls.findOne({ 'opening_event.id': pull_id }, callback);
+      }
+      else {
+        callback(err, item);
+      }
+
+    }.bind(this));
+  };
+
   MongoDB.prototype.findPullByRepoId = function(pull_number, pull_repo_id, callback) {
     pull_number = parseInt(pull_number);
     pull_repo_id = parseInt(pull_repo_id);
@@ -78,6 +97,7 @@ exports.init = function(config, log) {
       number: pull.number,
       repo_id: pull.base.repo.id,
       repo: pull.repo,
+      pull_id: pull.id,
       created_at: pull.created_at,
       updated_at: pull.updated_at,
       head: pull.head.sha,

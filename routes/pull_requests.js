@@ -25,5 +25,26 @@ exports.init = function(app) {
     });
   });
 
+  route.get('/:id', function(request, response, next) {
+    var id = request.params.id;
+
+    app.log.debug('Request received for pull request ' + id);
+
+    app.db.findPullByID(id, function(err, item) {
+
+      if (err) {
+        app.log.error('pull_requests query error!', err);
+        response.send(500, 'Could not retrieve pull_request ' + id);
+      }
+
+      if (!item) {
+        app.log.error('Could not find pr with id ' + id);
+        response.send(404, 'Pull_request with id ' + id + ' not found');
+      }
+
+      response.send(200, item);
+    });
+  });
+
   return route;
 };
