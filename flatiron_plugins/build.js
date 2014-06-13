@@ -1,6 +1,6 @@
 "use strict";
 
-var BuildSys = require('../libraries/build'),
+var BuildSys = require('../libraries/adapters/build'),
 plugin;
 
 module.exports = plugin = {

@@ -1,6 +1,7 @@
 "use strict";
 
-var GithubWrapper = require('../libraries/github'),
+// TODO: abstract receiver out
+var GithubWrapper = require('../libraries/plugins/receivers/github'),
 plugin;
 
 module.exports = plugin = {

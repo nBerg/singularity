@@ -68,7 +68,7 @@ function getClient() {
   throw 'No DB client - error connecting on startup? Incorrect configuration?';
 }
 
-module.exports = require('./vent').extend({
+module.exports = require('../vent').extend({
   init: function(option) {
     // TODO: think about putting this into vent instead
     option = require('nconf').defaults(option);

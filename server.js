@@ -69,7 +69,7 @@ configEvents = [
 ],
 
 server = app.start(app.config.get('port'), function() {
-  singularity.injectFlatironPlugins(__dirname + '/plugins');
+  singularity.injectFlatironPlugins(__dirname + '/flatiron_plugins');
 
   singularity.createChannelEventChain(pushChain);
   singularity.createChannelEventChain(pullChain);

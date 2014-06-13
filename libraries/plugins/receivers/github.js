@@ -4,7 +4,7 @@ var GitHubApi = require('github'),
 async = require('async'),
 q = require('q');
 
-module.exports = require('./vent').extend({
+module.exports = require('../../vent').extend({
   init: function(option) {
     this._super(option);
     this._api = new GitHubApi({

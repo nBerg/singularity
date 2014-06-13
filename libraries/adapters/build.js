@@ -3,10 +3,10 @@
 var q = require('q'),
     async = require('async');
 
-module.exports = require('./vent').extend({
+module.exports = require('../vent').extend({
   init: function(option) {
     this._super(option);
-  },
+  },p
 
   start: function() {
     var self = this,
@@ -32,4 +32,3 @@ module.exports = require('./vent').extend({
 
   }
 });
-

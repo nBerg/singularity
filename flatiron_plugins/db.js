@@ -1,7 +1,7 @@
 "use strict";
 
 var plugin,
-Db = require('../libraries/db');
+Db = require('../libraries/adapters/db');
 
 // TODO: refactor so that it's easy to swap this out with other DB libs
 module.exports = plugin = {
