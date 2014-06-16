@@ -76,6 +76,42 @@ function requestWrapper(route) {
 }
 
 /**
+ * Given a path and a route, build the arguments
+ * needed to add to the router.
+ *
+ * @param {string} the path
+ * @param {Object} the object with route callback and method
+ * @return [{Object}] router arguments object
+ */
+function buildRouteArgs(path, route) {
+  return [
+    route.method || 'get',
+    path,
+    function() {
+      requestWrapper.call(this, route)
+      .then(packageMeta)
+      .then(publishEvents);
+    }
+  ];
+}
+
+/**
+ * Add a route to the router.
+ *
+ * @param {string} the path
+ * @param {(Object | Object[])} object(s) with route callback and method
+ */
+function addToRouter(path, route) {
+   if (!Array.isArray(route)) {
+     route = [route];
+   }
+
+  route.forEach(function(route) {
+    app.router.on.apply(app.router, buildRouteArgs(path, route));
+  }, this);
+}
+
+/**
  * Given a config, fills in the blanks that are required
  *
  * @param {Object} config
@@ -90,16 +126,28 @@ function standardizeConfig(config) {
     config.github.repos = [];
   }
 
-  if (!config.jenkins) {
-    config.jenkins = {};
+  if (!config.build) {
+    config.build = {
+      'jenkins': {
+        'projects': [],
+        'push_projects': {}
+      }
+    };
   }
 
-  if (!config.jenkins.projects) {
-    config.jenkins = [];
-  }
-
-  if (!config.jenkins.push_projects) {
-    config.jenkins.push_projects = {};
+  if (!config.db) {
+    config.db = {
+      'mongo': {
+        "auth": {
+          "user": "username",
+          "pass": "password",
+          "host": "localhost",
+          "port": 27017,
+          "db": "singularityOverhaul",
+          "slaveOk": false
+        }
+      }
+    };
   }
 
   return config;
@@ -163,18 +211,7 @@ var Singularity = require('nbd/Class').extend({
 
     Object.keys(routes)
     .forEach(function(path) {
-      var route = routes[path],
-      routerArgs = [
-        route.method || 'get',
-        path,
-        function() {
-          requestWrapper.call(this, route)
-          .then(packageMeta)
-          .then(publishEvents);
-        }
-      ];
-
-      app.router.on.apply(app.router, routerArgs);
+      addToRouter(path, routes[path]);
     }, this);
   },
 
@@ -185,6 +222,10 @@ var Singularity = require('nbd/Class').extend({
           var filename = path.join(dir, file),
               pluginName = file.substring(0, file.lastIndexOf('.')),
               appCfg = app.config.get(pluginName);
+
+          this.log.debug('Trying to attach flatiron plugin: ' + pluginName);
+          this.log.debug('  ' + pluginName + ' config: ');
+          this.log.debug(appCfg);
 
           if (!filename.match(/\.js$/) || !appCfg || appCfg.disabled) {
             this.log.debug('Ignore the fallen.', { name: pluginName });
