@@ -182,6 +182,7 @@ module.exports = function(config, log) {
     }
 
     app.emit('github.new_repo', params.repo);
+    return true;
   };
 
   app.addRepoPRJob = function(params) {

@@ -102,6 +102,41 @@ describe('libraries/singularity', function() {
     });
   });
 
+  describe('addRepo', function() {
+    var self = this,
+        config = {
+          plugins: {
+            github: {
+              repos: ['test_repo']
+            }
+          }
+        };
+
+    beforeEach(function(done) {
+      self.app = new Singularity(config, test.log);
+      self.logSpy = sinon.spy(),
+      self.emitSpy = sinon.spy();
+      sinon.stub(self.app.log, 'info', self.logSpy);
+      sinon.stub(self.app, 'emit', self.emitSpy);
+
+      done();
+    });
+
+    it('does not update when repo is already in github config', function() {
+      var args = { repo: 'test_repo', project: 'test_repo_project' };
+      expect(self.app.addRepo(args)).to.be.false;
+      expect(self.logSpy).to.have.been.calledWithExactly('duplicate github repo', args);
+      expect(self.emitSpy).to.not.have.been.called;
+    });
+
+    it('updated config when new repo is added', function() {
+      var args = { repo: 'new_test_repo', project: 'new_test_project' };
+      expect(self.app.addRepo(args)).to.be.true;
+      expect(self.emitSpy).to.have.been.calledWithExactly('github.new_repo', 'new_test_repo');
+    });
+
+  });
+
   describe('addRepoPRJob', function() {
     var self = this,
         config = {
@@ -134,13 +169,6 @@ describe('libraries/singularity', function() {
       done();
     });
 
-    it('does not update when repo is already in github config', function() {
-      var args = { repo: 'test_repo', project: 'test_repo_project' };
-      expect(self.app.addRepoPRJob(args)).to.be.false;
-      expect(self.logSpy).to.have.been.calledWithExactly('duplicate github repo', args);
-      expect(self.emitSpy).to.not.have.been.called;
-    });
-
     it('does not update when repo is already in a jenkins config', function() {
       var args = { repo: 'test_repo2', project: 'new_test_repo2_project' };
       expect(self.app.addRepoPRJob(args)).to.be.false;
@@ -156,12 +184,80 @@ describe('libraries/singularity', function() {
     });
 
     it('actually updates properly', function() {
-      var args = { repo: 'new_test_repo', project: 'new_test_project' };
+      var args = { repo: 'new_test_repo', project: 'new_test_project' },
+          spy = sinon.spy();
+
+      sinon.stub(self.app, 'addRepo', spy);
 
       expect(self.app.addRepoPRJob(args)).to.be.true;
+      expect(spy).to.be.called;
       expect(self.logSpy).to.have.been.called;
       expect(self.emitSpy).to.have.been.calledWith('jenkins.new_pr_job');
-      expect(self.emitSpy).to.have.been.calledWithExactly('github.new_repo', 'new_test_repo');
+    });
+  });
+
+  describe('addRepoPushJob', function() {
+    var self = this,
+        config = {
+          plugins: {
+            github: {
+              repos: ['test_repo']
+            },
+            jenkins: {
+              projects: [
+                {
+                  repo: 'new_test_repo',
+                  name: 'new_test_project'
+                }
+              ],
+              push_projects: [
+                {
+                  repo: 'test_repo',
+                  name: 'test_repo_project'
+                },
+                {
+                  repo: 'test_repo2',
+                  name: 'test_repo2_project'
+                }
+              ]
+            }
+          }
+        };
+
+    beforeEach(function(done) {
+      self.app = new Singularity(config, test.log);
+      self.logSpy = sinon.spy(),
+      self.emitSpy = sinon.spy();
+      sinon.stub(self.app.log, 'info', self.logSpy);
+      sinon.stub(self.app, 'emit', self.emitSpy);
+
+      done();
+    });
+
+    it('does not update when repo is already in a jenkins config', function() {
+      var args = { repo: 'test_repo2', project: 'new_test_repo2_project' };
+      expect(self.app.addRepoPushJob(args)).to.be.false;
+      expect(self.logSpy).to.have.been.calledWithExactly('duplicate jenkins repo or project', args);
+      expect(self.emitSpy).to.not.have.been.called;
+    });
+
+    it('does not update when project is already in a jenkins config', function() {
+      var args = { repo: 'new_test_repo', project: 'test_repo2_project' };
+      expect(self.app.addRepoPushJob(args)).to.be.false;
+      expect(self.logSpy).to.have.been.calledWithExactly('duplicate jenkins repo or project', args);
+      expect(self.emitSpy).to.not.have.been.called;
+    });
+
+    it('actually updates properly', function() {
+      var args = { repo: 'new_test_repo', project: 'new_test_project' },
+          spy = sinon.spy();
+
+      sinon.stub(self.app, 'addRepo', spy);
+
+      expect(self.app.addRepoPushJob(args)).to.be.true;
+      expect(spy).to.be.called;
+      expect(self.logSpy).to.have.been.called;
+      expect(self.emitSpy).to.have.been.calledWith('jenkins.new_push_job');
     });
   });
 
