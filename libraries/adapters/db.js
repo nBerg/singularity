@@ -2,6 +2,7 @@
 
 var q = require('q'),
 fs = require('fs'),
+path = require('path'),
 insertionStatuses = ['ignored', 'updated', 'stored'],
 clientConnection;
 
@@ -81,7 +82,8 @@ module.exports = require('../vent').extend({
       return;
     }
 
-    var clientPath = this.config.get('client_path') || (__dirname + '/db/' + client + '.js');
+    var clientPath = this.config.get('client_path') ||
+                     path.join(__dirname, '../plugins/dbs/', client + '.js');
     if (fs.existsSync(clientPath)) {
       var ClientObj = require(clientPath);
 
