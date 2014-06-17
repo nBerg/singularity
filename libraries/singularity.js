@@ -32,7 +32,6 @@ function requestWrapper(route) {
   return retval;
 }
 
-
 /**
  * Given a path and a route object, build the arguments
  * needed to add to the router.
@@ -96,7 +95,7 @@ function standardizeConfig(config) {
         level: 'debug',
         colorize: true
       }
-    }
+    };
   }
 
   if (!config.github) {
@@ -109,17 +108,16 @@ function standardizeConfig(config) {
 
   if (!config.build) {
     config.build = {
-      'jenkins': {
-        'projects': [],
-        'push_projects': []
+      jenkins: {
+        projects: [],
+        push_projects: []
       }
     };
   }
 
   if (!config.db) {
     config.db = {
-      'mongo': {
-      }
+      mongo: {}
     };
   }
 
@@ -127,7 +125,7 @@ function standardizeConfig(config) {
     config.cache = {
       max: 64,
       maxAge: 60 * 1000
-    }
+    };
   }
 
   return config;
@@ -138,7 +136,7 @@ var Singularity = require('nbd/Class').extend({
     app.config.defaults(standardizeConfig({}));
     app.init();
     this.log = app.log.get('console');
-    this.eventMapper = new EventMapper;
+    this.eventMapper = new EventMapper();
   },
 
   route: function(routes) {

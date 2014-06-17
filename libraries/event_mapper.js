@@ -81,6 +81,11 @@ module.exports = require('nbd/Class').extend({
     this.log = app.log.get('console');
   },
 
+  react: function(data) {
+    return packageMeta(data)
+    .then(publishEvents);
+  },
+
   addTrigger: function(trigger) {
     validateTrigger(trigger)
     .then(createTrigger)
