@@ -142,15 +142,15 @@ function standardizeConfig(config) {
 
   if (!config.db) {
     config.db = {
-      'mongo': {
-        "auth": {
-          "user": "username",
-          "pass": "password",
-          "host": "localhost",
-          "port": 27017,
-          "db": "singularityOverhaul",
-          "slaveOk": false
-        }
+      'memory': {
+        // "auth": {
+        //   "user": "username",
+        //   "pass": "password",
+        //   "host": "localhost",
+        //   "port": 27017,
+        //   "db": "singularityOverhaul",
+        //   "slaveOk": false
+        // }
       }
     };
   }

@@ -10,16 +10,16 @@ app.use(flatiron.plugins.http);
 
 var singularity = require('./libraries/singularity'),
 pushChain = [
-  {channel: 'github', topic: 'push', vent: 'github', callback: 'handlePush'},
-  {channel: 'github', topic: 'push.validated', vent: 'db', callback: 'findPush'},
-  {channel: 'db', topic: 'push.not_found', vent: 'jenkins', callback: 'buildPush'},
-  {channel: 'jenkins', topic: 'push.triggered', vent: 'db', callback: 'insertPush'}
+  {channel: 'hook', topic: 'push', vent: 'receiver', callback: 'handlePush'},
+  {channel: 'receiver', topic: 'push.validated', vent: 'db', callback: 'findPush'},
+  {channel: 'db', topic: 'push.not_found', vent: 'build', callback: 'buildPush'},
+  {channel: 'build', topic: 'push.triggered', vent: 'db', callback: 'insertPush'}
 ],
 
 pullChain = [
   // incoming from *some* source (hook, issue_comment, w/e) & then validate that this is a payload
   // that we should trigger a build for
-  {channel: 'receiver', topic: 'pull_request', vent: 'receiver', callback: 'handlePullRequest'},
+  {channel: 'hook', topic: 'pull_request', vent: 'receiver', callback: 'handlePullRequest'},
   {channel: 'receiver', topic: 'pull_request.validated', vent: 'db', callback: 'findPullRequest'},
 
   // see if we contain a record of this PR & process if we have it on record
@@ -37,9 +37,7 @@ pullChain = [
   {channel: 'build', topic: 'pull_request.triggered', vent: 'db', callback: 'insertPullRequestJob'},
 
   // once stored, create a status - say that the build is starting, no link yet
-  {channel: 'db', topic: 'pull_request.build_stored', vent: 'publisher', callback: 'createStatus'},
-
-  {channel: 'publisher', topic: 'status.created', vent: 'application', callback: 'createResponse'}
+  {channel: 'db', topic: 'pull_request.build_stored', vent: 'publisher', callback: 'createStatus'}
 
 
 
@@ -55,12 +53,12 @@ pullChain = [
   //                           -> publisher.publish_building_status
 ],
 
-commentChain = [
+retestChain = [
   // depending on whether the callback publishes an event or not, the rest of the chain *should* be
   // equivalent to the `pullChain`
   // i.e.: `handleIssueComment()` must publish data that is isometric to a regular pull_request
   //       event payload
-  {channel: 'github', topic: 'issue_comment', vent: 'github', callback: 'handleIssueComment'}
+  {channel: 'hook', topic: 'retest', vent: 'receiver', callback: 'handleRetest'}
 ],
 
 buildChain = [
@@ -89,7 +87,7 @@ app.start(8085, function() {
   singularity.createChannelEventChain(pushChain);
   singularity.createChannelEventChain(pullChain);
   singularity.createChannelEventChain(buildChain);
-  singularity.createChannelEventChain(commentChain);
+  singularity.createChannelEventChain(retestChain);
   singularity.createChannelEventChain(configEvents);
 
   singularity.route({

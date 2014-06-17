@@ -4,7 +4,7 @@ var q = require('q'),
     // async = require('async'),
 
     // TODO: Keep these concepts? or rename?
-    allowed_events = ['pull_request', 'issue_comment', 'push'];
+    allowed_events = ['pull_request', 'retest', 'push'];
 
 module.exports = require('../vent').extend({
   receiver: undefined,
@@ -65,18 +65,30 @@ module.exports = require('../vent').extend({
   handlePullRequest: function(payload) {
     this.log.debug('handling pull_request');
 
-    var action = this.receiver.handlePullRequest(payload);
+    var pull_request = this.receiver.handlePullRequest(payload);
 
-    if (!~['validated', 'updated', 'closed'].indexOf(action)) {
+    if (!~['validated', 'updated', 'closed'].indexOf(pull_request.action)) {
       //not supported
-    };
+    }
 
-    this.publish('pull_request.' + action, payload);
+    this.publish('pull_request.' + pull_request.action, payload);
+  },
+  //
+  // processPullRequest: function(payload) {
+  //   this.log.debug('processing pull_request');
+  //
+  //   this.publish('pull_request.updated');
+  // },
+
+  handlePush: function(payload) {
+    this.log.debug('processing push - not implemented yet');
+
+    this.publish('push.validated');
   },
 
-  processPullRequest: function(payload) {
-    this.log.debug('processing pull_request');
+  handleRetest: function(paylod) {
+    this.recevier.debug('handling retest - not implemented yet');
 
-    this.publish('pull_request.updated');
+    //TODO: Decide what to do here
   }
 });

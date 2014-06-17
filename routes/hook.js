@@ -56,7 +56,7 @@ function handleRequest(request, app) {
 
     var meta = {};
     // meta['github.' + request.headers['x-github-event']] = data;
-    meta['receiver.' + req.type] = req.data;
+    meta['hook.' + req.type] = req.data;
 
     return meta;
   });

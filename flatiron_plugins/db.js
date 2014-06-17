@@ -8,12 +8,13 @@ module.exports = plugin = {
   name: 'Database',
 
   attach: function(options) {
+    this.log.debug("attaching db");
     this.db = new Db(options);
     this.db.log = this.log.get('console');
   },
 
   init: function(done) {
-    this.db.setClient(this.config.get('db.client') || 'mongo');
+    this.db.setClient(this.config.get('db.client') || 'memory');
     done();
   }
 };

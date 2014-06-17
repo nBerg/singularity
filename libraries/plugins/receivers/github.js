@@ -1,8 +1,8 @@
 // "use strict";
 //
- var GitHubApi = require('github');
+ var GitHubApi = require('github'),
 // async = require('async'),
-//q = require('q');
+q = require('q');
 //
 module.exports = require('../../vent').extend({
   init: function(option) {
@@ -58,7 +58,13 @@ module.exports = require('../../vent').extend({
   },
 
   parseEvent: function(request) {
-    return request.headers['x-github-event'];
+    var event = request.headers['x-github-event'];
+
+    if (event === 'issue_comment') {
+      return 'retest';
+    }
+
+    return event;
   },
 
   handleRequest: function(request) {
@@ -324,7 +330,7 @@ module.exports = require('../../vent').extend({
       return;
     }
 
-    // pull.repo = pull.base.repo.name;
+    pull.repo = pull.base.repo.name;
     // if (this.config.skip_file_listing) {
     //   this.log.debug('skipping file listing for PR');
     //   pull.files = [];
@@ -335,39 +341,49 @@ module.exports = require('../../vent').extend({
     // }
 
 
+    // TODO: Decide what this return object should look like
+
     // TODO: Possibly updated?
-    return 'validated';
+    pull.action = 'validated';
+    return pull;
   },
-//
-//   /**
-//    * Receives an issue comment from a webhook event and checks to see if we need to worry about it. If so the
-//    * associated pull request will be loaded via the REST API and sent on its way for processing.
-//    *
-//    * @method handleIssueComment
-//    * @param comment {Object}
-//    */
-//   handleIssueComment: function(comment) {
-//     // This event will pick up comments on issues and pull requests but we only care about pull requests
-//     if (comment.issue.pull_request.html_url == null) {
-//       this.log.debug('Ignoring non-pull request issue notification');
-//       return;
-//     }
-//
-//     if (!~comment.comment.body.indexOf('@' + this.config.auth.username + ' retest')) { return; }
-//
-//     this.log.debug('Received retest request for pull', { pull_number: comment.issue.number, repo: comment.repository.name });
-//
-//     return q.ninvoke(this._api.pullRequests, 'get', {
-//       user: this.config.user,
-//       repo: comment.repository.name,
-//       number: comment.issue.number
-//     })
-//     .then(function(pull) {
-//       pull.issue_comment = true;
-//       this.publish('pull_request', pull);
-//     }.bind(this))
-//     .catch(this.error);
-//   },
+
+  handleRetest: function(payload) {
+    console.log("HERE");
+    this.log.debug("here");
+    //just assume all retests issue comments for now
+    this.handleIssueComment(payload);
+  },
+
+  /**
+   * Receives an issue comment from a webhook event and checks to see if we need to worry about it. If so the
+   * associated pull request will be loaded via the REST API and sent on its way for processing.
+   *
+   * @method handleIssueComment
+   * @param comment {Object}
+   */
+  handleIssueComment: function(comment) {
+    // This event will pick up comments on issues and pull requests but we only care about pull requests
+    if (comment.issue.pull_request.html_url == null) {
+      this.log.debug('Ignoring non-pull request issue notification');
+      return;
+    }
+
+    if (!~comment.comment.body.indexOf('@' + this.config.auth.username + ' retest')) { return; }
+
+    this.log.debug('Received retest request for pull', { pull_number: comment.issue.number, repo: comment.repository.name });
+
+    return q.ninvoke(this._api.pullRequests, 'get', {
+      user: this.config.user,
+      repo: comment.repository.name,
+      number: comment.issue.number
+    })
+    .then(function(pull) {
+      pull.issue_comment = true;
+      this.publish('pull_request', pull);
+    }.bind(this))
+    .catch(this.error);
+  },
 //
 //   /**
 //    * Processes & validates push events
