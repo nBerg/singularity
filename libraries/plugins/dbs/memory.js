@@ -23,9 +23,10 @@ module.exports = require('nbd/Class').extend({
 
   insertPull: function(data) {
     if (!this.collections.pulls[data.pr_id]) {
-      this.collections.pulls[data.pr_id] = {
-        // TODO: what to store
-      };
+      //TODO
+      this.collections.pulls[data.pr_id] = data;
+
+      this.printDB();
 
       return q.fcall(function () {
         return retVals.stored;
@@ -38,5 +39,20 @@ module.exports = require('nbd/Class').extend({
         return retVals.updated;
       });
     }
+  },
+
+  insertPullRequestJob: function(pr, job) {
+    if (!this.collections.pulls[pr].jobs[job.job_id]) {
+      this.collections.pulls[pr].jobs[job.job_id] = job;
+
+      this.printDB();
+    }
+
+    // TODO: Handle
+  },
+
+  printDB: function() {
+    console.log('pulls');
+    console.log(this.collections.pulls);
   }
 });

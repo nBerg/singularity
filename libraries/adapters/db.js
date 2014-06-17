@@ -13,8 +13,21 @@ function getClient() {
   throw 'No DB client - error connecting on startup? Incorrect configuration?';
 }
 
-function buildPullRecord(pull) {
-  return {};
+function buildPullRequestRecord(pull) {
+  return {
+    pr_id: pull.pull_request.id,
+    repo_id: pull.repository.id,
+    repo: pull.repository.name,
+    number: pull.number,
+    head: pull.pull_request.head.sha,
+    merged: false,
+    status: 'open',
+    jobs: {}
+
+    // // Not used right now
+    // merge_result: null,
+    // extra_info: pull
+  };
 }
 
 module.exports = require('../vent').extend({
@@ -61,37 +74,35 @@ module.exports = require('../vent').extend({
   insertPullRequest: function(pull) {
     this.log.debug("inserting pull_request");
 
-
-
     var self = this;
 
     return q.fcall(getClient)
     .thenResolve(pull)
-    .then(buildPullRecord)
+    .then(buildPullRequestRecord)
     .then(function(record) {
       return clientConnection.insertPull(record)
       .then(function(res) {
         if (!!~insertionStatuses.indexOf(res)) {
-          self.publish('pull_request.' + res, pull);
+          self.publish('pull_request.' + res, record);
           return;
         }
 
         // -1 means (to us) that nothing happened
         if (!~res) {
-          self.publish('pull_request.not_stored', pull);
+          self.publish('pull_request.not_stored', record);
           return;
         }
         // >= 1 means that something was inserted
         if (res) {
-          self.publish('pull_request.stored', pull);
+          self.publish('pull_request.stored', record);
           return;
         }
         // 0 means that something happened, but nothing was added
-        self.publish('pull_request.updated', pull);
+        self.publish('pull_request.updated', record);
       })
       .catch(function(err) {
         pull.error = err;
-        self.publish('pull_request.not_stored', pull);
+        self.publish('pull_request.not_stored', record);
       })
       .done();
     })
@@ -99,10 +110,20 @@ module.exports = require('../vent').extend({
     .done();
   },
 
-  insertPullRequestJob: function(pull, job) {
-    this.log.debug("attaching job to pr - not implemented");
+  insertPullRequestJob: function(prJob) {
+    this.log.debug("attaching job to pr");
 
-    this.publish("pull_request.build_stored", pull);
+    // TODO: check for job existing and other cases
+
+    return q.fcall(getClient)
+    .then(function(client) {
+
+      client.insertPullRequestJob(prJob.pull, prJob.job);
+      this.publish("pull_request.build_stored", prJob.pull);
+      
+    }.bind(this))
+    .catch(this.log.error(this.error))
+    .done();
   }
 });
 

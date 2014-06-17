@@ -18,10 +18,6 @@ module.exports = require('../vent').extend({
   },
 
   createStatus: function(status) {
-    this.log.debug('creating status');
-    return{
-      status: '200',
-      message: 'successful'
-    };
+    this.log.debug('creating status - not implemented');
   }
 });
