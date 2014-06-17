@@ -396,8 +396,9 @@ Jenkins.prototype.checkPRJob = function(pull) {
     }
 
     if (job.status === 'new') {
-      self.application.db.updatePRJobStatus(job.id, 'started', 'BUILDING');
-      self.application.emit('build.started', job, pull, build.url);
+      self.application.db.updatePRJobStatus(job.id, 'started', 'BUILDING', function() {
+        self.application.emit('build.started', job, pull, build.url);
+      });
     }
 
     if (job.status === 'finished' || build.building) {
@@ -408,12 +409,12 @@ Jenkins.prototype.checkPRJob = function(pull) {
         debugInfo = { event: event, repo: pull.repo, number: pull.number, job: job};
 
     self.application.log.debug('PR event', debugInfo);
-    self.application.emit(event, job, pull, build.url);
-    self.application.db.updatePRJobStatus(job.id, 'finished', build.result);
-
-    if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
-      self.processArtifacts(project.name, build, pull);
-    }
+    self.application.db.updatePRJobStatus(job.id, 'finished', build.result, function() {
+      self.application.emit(event, job, pull, build.url);
+      if (['FAILURE', 'SUCCESS'].indexOf(build.result) !== -1) {
+        self.processArtifacts(project.name, build, pull);
+      }
+    });
   });
 };
 
