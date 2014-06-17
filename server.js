@@ -19,25 +19,40 @@ pushChain = [
 pullChain = [
   // incoming from *some* source (hook, issue_comment, w/e) & then validate that this is a payload
   // that we should trigger a build for
-  {channel: 'github', topic: 'pull_request', vent: 'github', callback: 'handlePullRequest'},
-  {channel: 'github', topic: 'pull_request.validated', vent: 'db', callback: 'findPullRequest'},
+  {channel: 'receiver', topic: 'pull_request', vent: 'receiver', callback: 'handlePullRequest'},
+  {channel: 'receiver', topic: 'pull_request.validated', vent: 'db', callback: 'findPullRequest'},
 
   // see if we contain a record of this PR & process if we have it on record
-  {channel: 'db', topic: 'pull_request.found', vent: 'github', callback: 'processPullRequest'},
+  {channel: 'db', topic: 'pull_request.found', vent: 'receiver', callback: 'processPullRequest'},
   // pull_request on record - update stored PR fields
-  {channel: 'github', topic: 'pull_request.updated', vent: 'db', callback: 'updatePullRequest'},
+  {channel: 'receiver', topic: 'pull_request.updated', vent: 'db', callback: 'updatePullRequest'},
   // otherwise, just insert
   {channel: 'db', topic: 'pull_request.not_found', vent: 'db', callback: 'insertPullRequest'},
 
   // regardless of whether the PR was new (stored) or updated, trigger a build
-  {channel: 'db', topic: 'pull_request.updated', vent: 'jenkins', callback: 'buildPullRequest'},
-  {channel: 'db', topic: 'pull_request.stored', vent: 'jenkins', callback: 'buildPullRequest'},
+  {channel: 'db', topic: 'pull_request.updated', vent: 'build', callback: 'buildPullRequest'},
+  {channel: 'db', topic: 'pull_request.stored', vent: 'build', callback: 'buildPullRequest'},
 
   // store data on the triggered job
-  {channel: 'jenkins', topic: 'pull_request.triggered', vent: 'db', callback: 'insertPullRequestJob'},
+  {channel: 'build', topic: 'pull_request.triggered', vent: 'db', callback: 'insertPullRequestJob'},
 
   // once stored, create a status - say that the build is starting, no link yet
-  {channel: 'db', topic: 'pull_request.build_stored', vent: 'github', callback: 'createStatus'}
+  {channel: 'db', topic: 'pull_request.build_stored', vent: 'publisher', callback: 'createStatus'},
+
+  {channel: 'publisher', topic: 'status.created', vent: 'application', callback: 'createResponse'}
+
+
+
+  // rec.new_pull -> db.process_pull -> build.build_pull -> publish.publish_pull_status_in_queue
+  //                                                     -> db.update_pull_status_to_building
+  //
+  // db.new_or_building_jobs -> builder.build_pull
+  //
+  // build.job_done -> publish.publish_succes/failure
+  //                -> db.update_status
+  //
+  // builder.queue_to_building -> db.update_build_status
+  //                           -> publisher.publish_building_status
 ],
 
 commentChain = [
@@ -66,9 +81,9 @@ buildChain = [
 configEvents = [
   {channel: 'github', topic: 'config', vent: 'github', callback: 'addRepo'},
   {channel: 'jenkins', topic: 'config', vent: 'jenkins', callback: 'addProject'}
-],
+];
 
-server = app.start(app.config.get('port'), function() {
+app.start(8085, function() {
   singularity.injectFlatironPlugins(__dirname + '/flatiron_plugins');
 
   singularity.createChannelEventChain(pushChain);

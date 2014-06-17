@@ -1,19 +1,19 @@
 // "use strict";
 //
- var GitHubApi = require('github');
+// var GitHubApi = require('github'),
 // async = require('async'),
-//q = require('q');
+// q = require('q');
 //
 module.exports = require('../../vent').extend({
-  init: function(option) {
-    this._super(option);
-    this._api = new GitHubApi({
-      version: '3.0.0',
-      // host: option.host,
-      // port: option.port
-    });
-    this.authenticate();
-  },
+//   init: function(option) {
+//     this._super(option);
+//     this._api = new GitHubApi({
+//       version: '3.0.0',
+//       host: option.host,
+//       port: option.port
+//     });
+//     this.authenticate();
+//   },
 //
 //   addRepo: function(data) {
 //     if (!data.repo || !data.organization) {
@@ -56,151 +56,128 @@ module.exports = require('../../vent').extend({
 //
 //     return this;
   },
-
-  parseEvent: function(request) {
-    return request.headers['x-github-event'];
-  },
-
-  handleRequest: function(request) {
-    var data;
-
-    try {
-      data = JSON.parse(JSON.stringify(request.body));
-    }
-    catch(err) {
-      throw {
-        status: 422,
-        body: {
-          message: 'Invalid payload sent. Make sure content type == "application/json"'
-        }
-      };
-    }
-
-    return data;
-  },
-
-
-  authenticate: function() {
-    this._api.authenticate(this.config.auth);
-  },
-  //
-  // /**
-  //  * Iterates over the configured list of repositories and uses the GitHub API to check each one for pull requests.
-  //  *
-  //  * @method checkRepos
-  //  */
-  // checkRepos: function() {
-  //   this.log.debug('Polling github for new and updated Pull Requests');
-  //
-  //   return q.allSettled(this.config.repos.map(function(repo) {
-  //     // Getting PRs for each repo
-  //     return q.ninvoke(this._api.pullRequests, 'getAll', {
-  //       user: this.config.user,
-  //       repo: repo,
-  //       state: 'open'
-  //     })
-  //     .then(function getPR(resp) {
-  //       return q.allSettled(Object.keys(resp)
-  //       .map(function(i) { return resp[i]; })
-  //       .filter(function(pull) {
-  //         return pull.number && pull.number !== 'undefined';
-  //       })
-  //       .map(function getPRDetails(pull) {
-  //         // Currently the GitHub API doesn't provide the same information for polling as
-  //         // it does when requesting a single, specific, pull request. So we have to
-  //         return q.ninvoke(this._api.pullRequests, 'get', {
-  //           user: this.config.user,
-  //           repo: repo,
-  //           number: pull.number
-  //         })
-  //         .then(function(pull) {
-  //           this.publish('pull_request', pull);
-  //         }.bind(this));
-  //       }, this));
-  //     }.bind(this))
-  //     .catch(this.error);
-  //   }, this));
-  // },
-  //
-  // /**
-  //  * Uses the GitHub API to pull the list of files and diffs for the provided pull request.
-  //  * These will be parsed and saved on the pull object to be saved to the database later.
-  //  *
-  //  * @method checkFiles
-  //  * @param pull {Object}
-  //  */
-  // checkFiles: function(pull) {
-  //   this.log.debug('Checking files for pull request', { pull_number: pull.number, repo: pull.repo });
-  //
-  //   return q.ninvoke(this._api.pullRequests, 'getFiles', {
-  //     user: this.config.user,
-  //     repo: pull.repo,
-  //     number: pull.number
-  //   })
-  //   .then(function(files) {
-  //     pull.files = files
-  //     .filter(function(file) {
-  //       return file.filename && file.filename !== 'undefined';
-  //     })
-  //     .map(function(file) {
-  //       var start = null,
-  //       length = null,
-  //       deletions = [],
-  //       modified_length,
-  //       offset = 0,
-  //       line_number = 0;
-  //
-  //       file.ranges = [];
-  //       file.reported = [];
-  //       file.sha = file.blob_url.match(/blob\/([^\/]+)/)[1];
-  //
-  //       // The GitHub API doesn't return the actual patch when it's exceedingly large
-  //       if (file.patch) {
-  //         file.patch.split('\n').forEach(function(line) {
-  //           var matches = line.match(/^@@ -\d+,\d+ \+(\d+),(\d+) @@/);
-  //           if (matches) {
-  //             if (start == null && length == null) {
-  //               start = parseInt(matches[1], 10);
-  //               length = parseInt(matches[2], 10);
-  //               line_number = start;
-  //             }
-  //             else {
-  //               // The one is for the line in the diff block containing the line numbers
-  //               modified_length = 1 + length + deletions.length;
-  //               file.ranges.push([start, start + length, modified_length, offset, deletions]);
-  //
-  //               deletions = [];
-  //               start = parseInt(matches[1], 10);
-  //               length = parseInt(matches[2], 10);
-  //               offset += modified_length;
-  //               line_number = start;
-  //             }
-  //           }
-  //           else if (line.indexOf('-') === 0) {
-  //             deletions.push(line_number);
-  //           }
-  //           else {
-  //             line_number += 1;
-  //           }
-  //         });
-  //       }
-  //
-  //       if (start != null && length != null) {
-  //         file.ranges.push([start, start + length, 1 + length + deletions.length, offset, deletions]);
-  //       }
-  //
-  //       return file;
-  //     });
-  //
-  //     if (pull.files.length > 0) {
-  //       this.publish('pull_request.validated', pull);
-  //     }
-  //     else {
-  //       this.log.info('Skipping pull request, no modified files found', { pull_number: pull.number, repo: pull.repo });
-  //     }
-  //   }.bind(this))
-  //   .catch(this.error);
-  // },
+//
+//   authenticate: function() {
+//     this._api.authenticate(this.config.auth);
+//   },
+//
+//   /**
+//    * Iterates over the configured list of repositories and uses the GitHub API to check each one for pull requests.
+//    *
+//    * @method checkRepos
+//    */
+//   checkRepos: function() {
+//     this.log.debug('Polling github for new and updated Pull Requests');
+//
+//     return q.allSettled(this.config.repos.map(function(repo) {
+//       // Getting PRs for each repo
+//       return q.ninvoke(this._api.pullRequests, 'getAll', {
+//         user: this.config.user,
+//         repo: repo,
+//         state: 'open'
+//       })
+//       .then(function getPR(resp) {
+//         return q.allSettled(Object.keys(resp)
+//         .map(function(i) { return resp[i]; })
+//         .filter(function(pull) {
+//           return pull.number && pull.number !== 'undefined';
+//         })
+//         .map(function getPRDetails(pull) {
+//           // Currently the GitHub API doesn't provide the same information for polling as
+//           // it does when requesting a single, specific, pull request. So we have to
+//           return q.ninvoke(this._api.pullRequests, 'get', {
+//             user: this.config.user,
+//             repo: repo,
+//             number: pull.number
+//           })
+//           .then(function(pull) {
+//             this.publish('pull_request', pull);
+//           }.bind(this));
+//         }, this));
+//       }.bind(this))
+//       .catch(this.error);
+//     }, this));
+//   },
+//
+//   /**
+//    * Uses the GitHub API to pull the list of files and diffs for the provided pull request.
+//    * These will be parsed and saved on the pull object to be saved to the database later.
+//    *
+//    * @method checkFiles
+//    * @param pull {Object}
+//    */
+//   checkFiles: function(pull) {
+//     this.log.debug('Checking files for pull request', { pull_number: pull.number, repo: pull.repo });
+//
+//     return q.ninvoke(this._api.pullRequests, 'getFiles', {
+//       user: this.config.user,
+//       repo: pull.repo,
+//       number: pull.number
+//     })
+//     .then(function(files) {
+//       pull.files = files
+//       .filter(function(file) {
+//         return file.filename && file.filename !== 'undefined';
+//       })
+//       .map(function(file) {
+//         var start = null,
+//         length = null,
+//         deletions = [],
+//         modified_length,
+//         offset = 0,
+//         line_number = 0;
+//
+//         file.ranges = [];
+//         file.reported = [];
+//         file.sha = file.blob_url.match(/blob\/([^\/]+)/)[1];
+//
+//         // The GitHub API doesn't return the actual patch when it's exceedingly large
+//         if (file.patch) {
+//           file.patch.split('\n').forEach(function(line) {
+//             var matches = line.match(/^@@ -\d+,\d+ \+(\d+),(\d+) @@/);
+//             if (matches) {
+//               if (start == null && length == null) {
+//                 start = parseInt(matches[1], 10);
+//                 length = parseInt(matches[2], 10);
+//                 line_number = start;
+//               }
+//               else {
+//                 // The one is for the line in the diff block containing the line numbers
+//                 modified_length = 1 + length + deletions.length;
+//                 file.ranges.push([start, start + length, modified_length, offset, deletions]);
+//
+//                 deletions = [];
+//                 start = parseInt(matches[1], 10);
+//                 length = parseInt(matches[2], 10);
+//                 offset += modified_length;
+//                 line_number = start;
+//               }
+//             }
+//             else if (line.indexOf('-') === 0) {
+//               deletions.push(line_number);
+//             }
+//             else {
+//               line_number += 1;
+//             }
+//           });
+//         }
+//
+//         if (start != null && length != null) {
+//           file.ranges.push([start, start + length, 1 + length + deletions.length, offset, deletions]);
+//         }
+//
+//         return file;
+//       });
+//
+//       if (pull.files.length > 0) {
+//         this.publish('pull_request.validated', pull);
+//       }
+//       else {
+//         this.log.info('Skipping pull request, no modified files found', { pull_number: pull.number, repo: pull.repo });
+//       }
+//     }.bind(this))
+//     .catch(this.error);
+//   },
 //
 //   /**
 //    * Decide whether this PR is considered to be updated or not
@@ -287,57 +264,53 @@ module.exports = require('../../vent').extend({
 //    * @method handlePullRequest
 //    * @param pull {Object}
 //    */
-  handlePullRequest: function(pull) {
-    // Check if this came through a webhooks setup
-    if (pull.action !== undefined) {
-      if (pull.action === 'closed') {
-        // this.publish('pull_request.closed', pull);
-        // if (pull.pull_request.merged) {
-        //   this.log.debug('pull was merged, skipping');
-        //   this.publish('pull_request.merged', pull);
-        // }
-        // else {
-        //   this.log.debug('pull was closed, skipping');
-        // }
-
-        return 'closed';
-      }
-
-      if (pull.action !== 'synchronize' && pull.action !== 'opened') {
-        this.log.debug('Ignoring pull request, action not supported', { pull_number: pull.number, action: pull.action });
-        return;
-      }
-
-      pull = pull.pull_request;
-    }
-
-    // During testing there were cases where the mergeable flag was null when using webhooks.
-    // In that case we want to allow the build to be attempted. We only want to prevent it when
-    // the mergeable flag is explicitly set to false.
-    if (pull.mergeable !== undefined && pull.mergeable === false) {
-      this.log.debug('Ignoring pull request, not in mergeable state', { pull_number: pull.number, mergeable: pull.mergeable });
-      return;
-    }
-
-    if (pull.body && pull.body.indexOf('@' + this.config.user + ' ignore') !== -1) {
-      this.log.debug('Ignoring pull request, flagged to be ignored', { pull_number: pull.number });
-      return;
-    }
-
-    // pull.repo = pull.base.repo.name;
-    // if (this.config.skip_file_listing) {
-    //   this.log.debug('skipping file listing for PR');
-    //   pull.files = [];
-    //   this.publish('pull_request.validated', pull);
-    // }
-    // else {
-    //   this.checkFiles(pull);
-    // }
-
-
-    // TODO: Possibly updated?
-    return 'validated';
-  },
+//   handlePullRequest: function(pull) {
+//     // Check if this came through a webhooks setup
+//     if (pull.action !== undefined) {
+//       if (pull.action === 'closed') {
+//         this.publish('pull_request.closed', pull);
+//         if (pull.pull_request.merged) {
+//           this.log.debug('pull was merged, skipping');
+//           this.publish('pull_request.merged', pull);
+//         }
+//         else {
+//           this.log.debug('pull was closed, skipping');
+//         }
+//
+//         return;
+//       }
+//
+//       if (pull.action !== 'synchronize' && pull.action !== 'opened') {
+//         this.log.debug('Ignoring pull request, action not supported', { pull_number: pull.number, action: pull.action });
+//         return;
+//       }
+//
+//       pull = pull.pull_request;
+//     }
+//
+//     // During testing there were cases where the mergeable flag was null when using webhooks.
+//     // In that case we want to allow the build to be attempted. We only want to prevent it when
+//     // the mergeable flag is explicitly set to false.
+//     if (pull.mergeable !== undefined && pull.mergeable === false) {
+//       this.log.debug('Ignoring pull request, not in mergeable state', { pull_number: pull.number, mergeable: pull.mergeable });
+//       return;
+//     }
+//
+//     if (pull.body && pull.body.indexOf('@' + this.config.user + ' ignore') !== -1) {
+//       this.log.debug('Ignoring pull request, flagged to be ignored', { pull_number: pull.number });
+//       return;
+//     }
+//
+//     pull.repo = pull.base.repo.name;
+//     if (this.config.skip_file_listing) {
+//       this.log.debug('skipping file listing for PR');
+//       pull.files = [];
+//       this.publish('pull_request.validated', pull);
+//     }
+//     else {
+//       this.checkFiles(pull);
+//     }
+//   },
 //
 //   /**
 //    * Receives an issue comment from a webhook event and checks to see if we need to worry about it. If so the

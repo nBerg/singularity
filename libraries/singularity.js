@@ -58,7 +58,9 @@ function requestWrapper(route) {
   deferred.resolve(this.req);
 
   var self = this,
-      retval = deferred.promise.then(route),
+      retval = deferred.promise.then(function(req) {
+        return route(req, app);
+      }),
       writeResponse = function(defaultStatus, meta) {
         self.res.statusCode = meta.status || defaultStatus;
         self.res.writeHead(meta.body || meta);
@@ -67,8 +69,10 @@ function requestWrapper(route) {
       };
 
   retval.done(function(meta) {
+    app.log.info('done success');
     writeResponse(200, meta);
   }, function(meta) {
+    app.log.info('done failure');
     writeResponse(500, meta);
   });
 
@@ -118,12 +122,13 @@ function addToRouter(path, route) {
  * @return {Object} updated config
  */
 function standardizeConfig(config) {
-  if (!config.github) {
-    config.github = {};
-  }
-
-  if (!config.github.repos) {
-    config.github.repos = [];
+  if (!config.receivers) {
+    config.receiver = {
+      'github': {
+        'repos': [],
+        'skip_file_listing': true
+      }
+    };
   }
 
   if (!config.build) {
@@ -148,6 +153,10 @@ function standardizeConfig(config) {
         }
       }
     };
+  }
+
+  if (!config.publisher) {
+    config.publisher = {};
   }
 
   return config;
