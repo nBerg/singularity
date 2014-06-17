@@ -15,6 +15,7 @@ function getClient() {
 
 module.exports = require('../vent').extend({
   init: function(option) {
+    option = require('nconf').defaults(option);
     this._super(option);
   },
 
