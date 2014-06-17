@@ -37,6 +37,12 @@ function packageMeta(meta) {
     // honestly have no idea if this resolves synchronously
     metaFields.forEach(function(field) {
       envelopes.push({
+        channel: 'workflow',
+        topic: field,
+        data: meta[field]
+      });
+
+      envelopes.push({
         channel: field.substring(0, field.indexOf('.')),
         topic: field.substring(field.indexOf('.') + 1, field.length),
         data: meta[field]
@@ -118,6 +124,23 @@ function addToRouter(path, route) {
  * @return {Object} updated config
  */
 function standardizeConfig(config) {
+  if (!config) {
+    config = {};
+  }
+
+  if (!config.port) {
+    config.port = 8080;
+  }
+
+  if (!config.log) {
+    config.log = {
+      console: {
+        level: 'debug',
+        colorize: true
+      }
+    }
+  }
+
   if (!config.github) {
     config.github = {};
   }
@@ -130,7 +153,7 @@ function standardizeConfig(config) {
     config.build = {
       'jenkins': {
         'projects': [],
-        'push_projects': {}
+        'push_projects': []
       }
     };
   }
@@ -138,16 +161,15 @@ function standardizeConfig(config) {
   if (!config.db) {
     config.db = {
       'mongo': {
-        "auth": {
-          "user": "username",
-          "pass": "password",
-          "host": "localhost",
-          "port": 27017,
-          "db": "singularityOverhaul",
-          "slaveOk": false
-        }
       }
     };
+  }
+
+  if (!config.cache) {
+    config.cache = {
+      max: 64,
+      maxAge: 60 * 1000
+    }
   }
 
   return config;
@@ -185,16 +207,7 @@ function createSubscriptions(events) {
 
 var Singularity = require('nbd/Class').extend({
   init: function() {
-    var defaultConfig = standardizeConfig({
-      port: 8080,
-      log: {
-        console: {
-          level: 'debug',
-          colorize: true
-        }
-      }
-    });
-    app.config.defaults(defaultConfig);
+    app.config.defaults(standardizeConfig({}));
     app.init();
     this.log = app.log.get('console');
   },
@@ -222,10 +235,6 @@ var Singularity = require('nbd/Class').extend({
           var filename = path.join(dir, file),
               pluginName = file.substring(0, file.lastIndexOf('.')),
               appCfg = app.config.get(pluginName);
-
-          this.log.debug('Trying to attach flatiron plugin: ' + pluginName);
-          this.log.debug('  ' + pluginName + ' config: ');
-          this.log.debug(appCfg);
 
           if (!filename.match(/\.js$/) || !appCfg || appCfg.disabled) {
             this.log.debug('Ignore the fallen.', { name: pluginName });
