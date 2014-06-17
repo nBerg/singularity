@@ -11,32 +11,32 @@ app.use(flatiron.plugins.http);
 
 var singularity = require('./libraries/singularity'),
 pushChain = [
-  {channel: 'github', topic: 'push', vent: 'github', callback: 'handlePush'},
-  {channel: 'github', topic: 'push.validated', vent: 'db', callback: 'findPush'},
-  {channel: 'db', topic: 'push.not_found', vent: 'jenkins', callback: 'buildPush'},
-  {channel: 'jenkins', topic: 'push.triggered', vent: 'db', callback: 'insertPush'}
+  {channel: 'receiver', topic: 'push', vent: 'receiver', callback: 'handlePush'},
+  {channel: 'receiver', topic: 'push.validated', vent: 'db', callback: 'findPush'},
+  {channel: 'db', topic: 'push.not_found', vent: 'build', callback: 'buildPush'},
+  {channel: 'build', topic: 'push.triggered', vent: 'db', callback: 'insertPush'}
 ],
 
 pullChain = [
   // incoming from *some* source (hook, issue_comment, w/e) & then validate that this is a payload
   // that we should trigger a build for
-  {channel: 'github', topic: 'pull_request', vent: 'github', callback: 'handlePullRequest'},
-  {channel: 'github', topic: 'pull_request.validated', vent: 'db', callback: 'findPullRequest'},
+  {channel: 'receiver', topic: 'pull_request', vent: 'receiver', callback: 'handlePullRequest'},
+  {channel: 'receiver', topic: 'pull_request.validated', vent: 'db', callback: 'findPullRequest'},
 
   // pull_request on record - update stored PR fields & trigger build
   {channel: 'db', topic: 'pull_request.updated', vent: 'db', callback: 'updatePullRequest'},
-  {channel: 'db', topic: 'pull_request.updated', vent: 'jenkins', callback: 'buildPullRequest'},
+  {channel: 'db', topic: 'pull_request.updated', vent: 'build', callback: 'buildPullRequest'},
 
   // not on record - insert & trigger
   {channel: 'db', topic: 'pull_request.not_found', vent: 'db', callback: 'insertPullRequest'},
-  {channel: 'db', topic: 'pull_request.not_found', vent: 'jenkins', callback: 'buildPullRequest'},
+  {channel: 'db', topic: 'pull_request.not_found', vent: 'build', callback: 'buildPullRequest'},
 
   // store data on the triggered job
-  {channel: 'jenkins', topic: 'pull_request.triggered', vent: 'db', callback: 'insertPullRequestJob'},
-  {channel: 'jenkins', topic: 'pull_request.triggered', vent: 'github', callback: 'createPendingStatus'},
+  {channel: 'build', topic: 'pull_request.triggered', vent: 'db', callback: 'insertPullRequestJob'},
+  {channel: 'build', topic: 'pull_request.triggered', vent: 'receiver', callback: 'createPendingStatus'},
 
   // once stored, update status with build link
-  {channel: 'db', topic: 'pull_request.build_stored', vent: 'github', callback: 'createStatus'}
+  {channel: 'db', topic: 'pull_request.build_stored', vent: 'receiver', callback: 'createStatus'}
 ],
 
 commentChain = [
@@ -44,7 +44,7 @@ commentChain = [
   // equivalent to the `pullChain`
   // i.e.: `handleIssueComment()` must publish data that is isometric to a regular pull_request
   //       event payload
-  {channel: 'github', topic: 'issue_comment', vent: 'github', callback: 'handleIssueComment'}
+  {channel: 'receiver', topic: 'issue_comment', vent: 'receiver', callback: 'handleIssueComment'}
 ],
 
 buildChain = [
@@ -58,13 +58,13 @@ buildChain = [
   {channel: 'build', topic: 'pull_request.build_updated', vent: 'db', callback: 'updatePullRequestJob'},
   {channel: 'build', topic: 'push.build_updated', vent: 'db', callback: 'updatePushJob'},
 
-  // pull_request.build.* => build status update in DB that should be written to github
-  {channel: 'db', topic: 'pull_request.build.*', vent: 'github', callback: 'createStatus'}
+  // pull_request.build.* => build status update in DB that should be written to receiver
+  {channel: 'db', topic: 'pull_request.build.*', vent: 'receiver', callback: 'createStatus'}
 ],
 
 configEvents = [
-  {channel: 'github', topic: 'config', vent: 'github', callback: 'addRepo'},
-  {channel: 'jenkins', topic: 'config', vent: 'jenkins', callback: 'addProject'}
+  {channel: 'receiver', topic: 'config', vent: 'receiver', callback: 'addRepo'},
+  {channel: 'build', topic: 'config', vent: 'build', callback: 'addProject'}
 ],
 
 server = app.start(app.config.get('port'), function() {
