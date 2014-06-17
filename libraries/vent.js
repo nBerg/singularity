@@ -14,10 +14,6 @@ module.exports = require('nbd/Class').extend({
   },
 
   publish: function(topic, data) {
-    this.log.debug(this.name + ' vent publishing on channel:');
-    this.log.debug(this.channel.channel);
-    this.log.debug('with topic: ' + topic);
-
     if (!this.channel) {
       this.error('cannot publish topic, no channel', {topic: topic, vent: this.name});
       return;

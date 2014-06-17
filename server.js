@@ -1,11 +1,12 @@
 "use strict";
 var flatiron = require('flatiron'),
+    path = require('path'),
     app = flatiron.app;
 
 // configure & init the flatiron app *then* instantiate singularity
 // init() instantiates the logs
 // also, because singletons, and I hate everything
-app.config.file(__dirname + '/config.json');
+app.config.file(path.join(__dirname, '/config.json'));
 app.use(flatiron.plugins.http);
 
 var singularity = require('./libraries/singularity'),
@@ -22,21 +23,19 @@ pullChain = [
   {channel: 'github', topic: 'pull_request', vent: 'github', callback: 'handlePullRequest'},
   {channel: 'github', topic: 'pull_request.validated', vent: 'db', callback: 'findPullRequest'},
 
-  // see if we contain a record of this PR & process if we have it on record
-  {channel: 'db', topic: 'pull_request.found', vent: 'github', callback: 'processPullRequest'},
-  // pull_request on record - update stored PR fields
-  {channel: 'github', topic: 'pull_request.updated', vent: 'db', callback: 'updatePullRequest'},
-  // otherwise, just insert
-  {channel: 'db', topic: 'pull_request.not_found', vent: 'db', callback: 'insertPullRequest'},
-
-  // regardless of whether the PR was new (stored) or updated, trigger a build
+  // pull_request on record - update stored PR fields & trigger build
+  {channel: 'db', topic: 'pull_request.updated', vent: 'db', callback: 'updatePullRequest'},
   {channel: 'db', topic: 'pull_request.updated', vent: 'jenkins', callback: 'buildPullRequest'},
-  {channel: 'db', topic: 'pull_request.stored', vent: 'jenkins', callback: 'buildPullRequest'},
+
+  // not on record - insert & trigger
+  {channel: 'db', topic: 'pull_request.not_found', vent: 'db', callback: 'insertPullRequest'},
+  {channel: 'db', topic: 'pull_request.not_found', vent: 'jenkins', callback: 'buildPullRequest'},
 
   // store data on the triggered job
   {channel: 'jenkins', topic: 'pull_request.triggered', vent: 'db', callback: 'insertPullRequestJob'},
+  {channel: 'jenkins', topic: 'pull_request.triggered', vent: 'github', callback: 'createPendingStatus'},
 
-  // once stored, create a status - say that the build is starting, no link yet
+  // once stored, update status with build link
   {channel: 'db', topic: 'pull_request.build_stored', vent: 'github', callback: 'createStatus'}
 ],
 
