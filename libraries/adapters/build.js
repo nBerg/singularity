@@ -6,7 +6,7 @@ var q = require('q'),
 module.exports = require('../vent').extend({
   init: function(option) {
     this._super(option);
-  },p
+  },
 
   start: function() {
     var self = this,
