@@ -17,17 +17,18 @@ module.exports = require('../vent').extend({
   init: function(option) {
     option = require('nconf').defaults(option);
     this._super(option);
+    this.name = 'BuildAdapter';
   },
 
   // todo: DRY b/w here & adapters/db
   setClient: function(client) {
     if (!this.config.get(client)) {
-      this.log.error('No config for db.<client>, ignoring', {client: client});
+      this.log.error('No config for build.<client>, ignoring', {client: client});
       return;
     }
 
     var clientPath = this.config.get('client_path') ||
-                     path.join(__dirname, '../builders/dbs/', client + '.js');
+                     path.join(__dirname, '../plugins/builders/', client + '.js');
     if (fs.existsSync(clientPath)) {
       var ClientObj = require(clientPath);
 
@@ -47,7 +48,7 @@ module.exports = require('../vent').extend({
   },
 
   start: function() {
-    if (this.config.method === 'hooks') {
+    if (this.config.get('method') === 'hooks') {
       this.publish('build.polling');
       return;
     }

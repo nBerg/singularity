@@ -74,6 +74,7 @@ module.exports = require('../vent').extend({
     // TODO: think about putting this into vent instead
     option = require('nconf').defaults(option);
     this._super(option);
+    this.name = 'DBAdapter';
   },
 
   setClient: function(client) {
