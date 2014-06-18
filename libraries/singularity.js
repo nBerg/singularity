@@ -64,7 +64,7 @@ function buildRoutes(path, routes, eventHandler) {
     return defer.promise;
   });
 
-  return q.allSettled(routePromises);
+  return q.all(routePromises);
 }
 
 /**
@@ -75,7 +75,7 @@ function buildRoutes(path, routes, eventHandler) {
 function dispatchRoutes(routes) {
   routes.forEach(function(route) {
     app.router.on.apply(app.router, route);
-  }, this);
+  });
 }
 
 /**
@@ -102,21 +102,24 @@ function standardizeConfig(config) {
     };
   }
 
-  if (!config.github) {
-    config.github = {};
-  }
-
-  if (!config.github.repos) {
-    config.github.repos = [];
-  }
-
   if (!config.build) {
     config.build = {
+      method: 'hooks',
       jenkins: {
         projects: [],
         push_projects: []
       }
     };
+  }
+
+  if (!config.github) {
+    config.github = {
+      method: 'hooks'
+    };
+  }
+
+  if (!config.github.repos) {
+    config.github.repos = [];
   }
 
   if (!config.db) {
@@ -133,6 +136,64 @@ function standardizeConfig(config) {
   }
 
   return config;
+}
+
+/**
+ * Generates flatiron plugin name from a filename
+ *
+ * @param {String} file
+ * @return {Promise} string
+ */
+function pluginNameFromFile(file) {
+  var defer = q.defer();
+  defer.resolve(file.substring(0, file.lastIndexOf('.')));
+  return defer.promise;
+}
+
+/**
+ * Validates a flatiron plugin file
+ *
+ * @param {String} file
+ * @return {Promise} file
+ */
+function checkPluginFile(file) {
+  var defer = q.defer();
+  if (!file.match(/\.js$/)) {
+    throw file + ' **PLUGIN FILE NOT VALID**';
+  }
+  defer.resolve(file);
+  return defer.promise;
+}
+
+/**
+ * Retrieves flatiron plugin config
+ *
+ * @param {String} name
+ * @return {Promise} Resolves with plugin cfg if found
+ */
+function pluginConfig(name) {
+  var defer = q.defer(),
+  cfg = app.config.get(name);
+  if (cfg && cfg.disabled) {
+    defer.reject(name + ' is disabled');
+  }
+  else if (cfg) {
+    defer.resolve(cfg);
+  }
+  else {
+    defer.reject('No config found for ' + name);
+  }
+  return defer.promise;
+}
+
+/**
+ * Injects flatiron plugin into app
+ *
+ * @param {String} file path to file
+ * @param {Object} cfg cfg for given plugin
+ */
+function appUsePlugin(file, cfg) {
+  app.use(require(file), cfg);
 }
 
 var Singularity = require('nbd/Class').extend({
@@ -163,25 +224,24 @@ var Singularity = require('nbd/Class').extend({
   },
 
   injectFlatironPlugins: function(dir) {
-    q.ninvoke(fs, 'readdir', dir)
-     .then(function(files) {
-       files.forEach(function(file) {
-          var filename = path.join(dir, file),
-              pluginName = file.substring(0, file.lastIndexOf('.')),
-              appCfg = app.config.get(pluginName);
-
-          if (!filename.match(/\.js$/) || !appCfg || appCfg.disabled) {
-            this.log.debug('Ignore the fallen.', { name: pluginName });
-            return;
-          }
-
-          var plugin = require(filename);
-          plugin.name = pluginName;
-          app.use(plugin, appCfg);
-       }.bind(this));
-     }.bind(this))
-     .catch(this.error)
-     .done();
+    var self = this;
+    return q.ninvoke(fs, 'readdir', dir)
+    .then(function(files) {
+      files.forEach(function(file) {
+        q.resolve(path.join(dir, file))
+        .then(checkPluginFile)
+        .thenResolve(
+          q.all([
+            path.join(dir, file),
+            pluginNameFromFile(file)
+            .then(pluginConfig)
+          ])
+        )
+        .spread(appUsePlugin)
+        .catch(self.log.error.bind(self));
+      });
+    })
+    .done();
   }
 });
 

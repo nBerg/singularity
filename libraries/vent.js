@@ -26,7 +26,7 @@ module.exports = require('nbd/Class').extend({
     this.error = this.error.bind(this);
   },
 
-  error: function(error) {
-    this.log.error(error);
+  error: function() {
+    this.log.error.apply(this.log, Array.prototype.slice.call(arguments));
   }
 });

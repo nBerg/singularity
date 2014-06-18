@@ -53,8 +53,15 @@ function packageMeta(meta) {
   });
 }
 
+/**
+ * Maps channel events to vent callbacks
+ *
+ * @param {Object} trigger    creates an event trigger, mapping a {channel,topic}
+ *                            to a {vent,callback}
+ * @return {Object} A promise
+ */
 function createTrigger(trigger) {
-  app.log.get('console').debug('Assuming direct control.', trigger);
+  app.log.get('console').debug('Adding trigger.', trigger);
 
   var channelObj = postal.channel(trigger.channel),
   callback = function(data, envelope) {
@@ -65,6 +72,12 @@ function createTrigger(trigger) {
   channelObj.subscribe(trigger.topic, callback);
 }
 
+/**
+ * Ensures that a given trigger is valid
+ *
+ * @param {Object} trigger    trigger to validate
+ * @return {Object} A promise
+ */
 function validateTrigger(trigger) {
   return q.fcall(function() {
     ['channel', 'topic', 'vent', 'callback'].forEach(function(param) {
@@ -76,6 +89,9 @@ function validateTrigger(trigger) {
   });
 }
 
+/**
+ * @module EventMapper
+ */
 module.exports = require('nbd/Class').extend({
   init: function(option) {
     this.log = app.log.get('console');
