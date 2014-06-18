@@ -61,7 +61,7 @@ function packageMeta(meta) {
  * @return {Object} A promise
  */
 function createTrigger(trigger) {
-  app.log.get('console').debug('Assuming direct control.', trigger);
+  app.log.get('console').debug('Adding trigger.', trigger);
 
   var channelObj = postal.channel(trigger.channel),
   callback = function(data, envelope) {
