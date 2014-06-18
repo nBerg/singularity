@@ -12,7 +12,7 @@ module.exports = plugin = {
   },
 
   init: function(done) {
-    this.build.setClient(this.config.get('build.client') || 'jenkins');
+    this.build.setClient(this.config.get('build').client);
     this.build.start();
     done();
   }

@@ -100,11 +100,19 @@ function standardizeConfig(config) {
 
   if (!config.build) {
     config.build = {
+      client: 'jenkins',
       method: 'hooks',
       jenkins: {
         projects: [],
         push_projects: []
       }
+    };
+  }
+
+  if (!config.db) {
+    config.db = {
+      client: 'memory',
+      memory: {}
     };
   }
 
@@ -116,12 +124,6 @@ function standardizeConfig(config) {
 
   if (!config.github.repos) {
     config.github.repos = [];
-  }
-
-  if (!config.db) {
-    config.db = {
-      mongo: {}
-    };
   }
 
   if (!config.cache) {
