@@ -10,11 +10,11 @@ function getClient() {
   if (clientConnection) {
     return clientConnection;
   }
-  throw 'No DB client - error connecting on startup? Incorrect configuration?';
+  throw 'No Build client - error connecting on startup? Incorrect configuration?';
 }
 
 function validateOpts() {
-  
+
 }
 
 module.exports = require('../vent').extend({

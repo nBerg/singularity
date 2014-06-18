@@ -15,6 +15,8 @@ function requestWrapper(route) {
   deferred.resolve(this.req);
 
   var self = this,
+
+      // TODO: Redo when we figure stuffs out
       retval = deferred.promise.then(function(req) {
         return route(req, app);
       }),

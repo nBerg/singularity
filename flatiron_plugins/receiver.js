@@ -3,7 +3,6 @@
 var plugin,
 Receiver = require('../libraries/adapters/receiver');
 
-// TODO: refactor so that it's easy to swap this out with other DB libs
 module.exports = plugin = {
   name: 'Receiver',
 
