@@ -10,7 +10,11 @@ function getClient() {
   if (clientConnection) {
     return clientConnection;
   }
-  throw 'No DB client - error connecting on startup? Incorrect configuration?';
+  throw 'No Build client - error connecting on startup? Incorrect configuration?';
+}
+
+function validateOpts() {
+
 }
 
 module.exports = require('../vent').extend({
@@ -66,12 +70,22 @@ module.exports = require('../vent').extend({
   },
 
   checkPullRequestJob: function(pull) {
-
+    this.log.debug('Checking status of a pr job');
+    // buildSys.checkPullRequestJob(pull);
   },
 
   checkPushJob: function(push) {
 
   },
+
+  // buildPullRequest: function(pull) {
+  //   this.log.debug('building pull request - not implemented');
+  //
+  //   // TODO: this should come from plugin
+  //   var prJob = {job: {job_id: '123'}, pull: pull.pr_id};
+  //
+  //   this.publish('pull_request.triggered', prJob);
+  // },
 
   triggerBuild: function(req_body) {
     var self = this;

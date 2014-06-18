@@ -8,8 +8,9 @@ var flatiron = require('flatiron'),
 app.config.file(path.join(__dirname, '/config.json'));
 app.use(flatiron.plugins.http);
 
-var singularity = require('./libraries/singularity'),
-server = app.start(app.config.get('port'), function() {
+var singularity = require('./libraries/singularity');
+
+app.start(app.config.get('port'), function() {
   singularity.injectFlatironPlugins(__dirname + '/flatiron_plugins');
   singularity.mapTriggers(require('./default_events'));
 
