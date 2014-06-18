@@ -4,7 +4,7 @@
 
 module.exports = [
     // PUSH CHAIN
-    {channel: 'receiver', topic: 'push', vent: 'receiver', callback: 'handlePush'},
+    {channel: 'hook', topic: 'push', vent: 'receiver', callback: 'handlePush'},
     {channel: 'receiver', topic: 'push.validated', vent: 'db', callback: 'findPush'},
     {channel: 'db', topic: 'push.not_found', vent: 'build', callback: 'buildPush'},
     {channel: 'build', topic: 'push.triggered', vent: 'db', callback: 'insertPush'},
@@ -12,7 +12,7 @@ module.exports = [
     // PULL REQUEST CHAIN
     // incoming from *some* source (hook, issue_comment, w/e) & then validate that this is a payload
     // that we should trigger a build for
-    {channel: 'receiver', topic: 'pull_request', vent: 'receiver', callback: 'handlePullRequest'},
+    {channel: 'hook', topic: 'pull_request', vent: 'receiver', callback: 'handlePullRequest'},
     {channel: 'receiver', topic: 'pull_request.validated', vent: 'db', callback: 'findPullRequest'},
     // pull_request on record - update stored PR fields & trigger build
     {channel: 'db', topic: 'pull_request.updated', vent: 'db', callback: 'updatePullRequest'},
@@ -22,9 +22,9 @@ module.exports = [
     {channel: 'db', topic: 'pull_request.not_found', vent: 'build', callback: 'buildPullRequest'},
     // store data on the triggered job
     {channel: 'build', topic: 'pull_request.triggered', vent: 'db', callback: 'insertPullRequestJob'},
-    {channel: 'build', topic: 'pull_request.triggered', vent: 'receiver', callback: 'createPendingStatus'},
+    {channel: 'build', topic: 'pull_request.triggered', vent: 'publisher', callback: 'createPendingStatus'},
     // once stored, update status with build link
-    {channel: 'db', topic: 'pull_request.build_stored', vent: 'receiver', callback: 'createStatus'},
+    {channel: 'db', topic: 'pull_request.build_stored', vent: 'publisher', callback: 'createStatus'},
 
     // ISSUE COMMENT CHAIN
     // depending on whether the callback publishes an event or not, the rest of the chain *should* be
@@ -32,6 +32,9 @@ module.exports = [
     // i.e.: `handleIssueComment()` must publish data that is isometric to a regular pull_request
     //       event payload
     {channel: 'receiver', topic: 'issue_comment', vent: 'receiver', callback: 'handleIssueComment'},
+    {channel: 'hook', topic: 'retest', vent: 'receiver', callback: 'handleRetest'},
+    {channel: 'receiver', topic: 'pull_request.retest', vent: 'build', callback: 'buildPullRequest'},
+    {channel: 'recevier', topic: 'push.retest', vent: 'build', callback: 'buildPush'},
 
     // BUILD CHAIN
     {channel: 'build', topic: 'jobs.polling', vent: 'db', callback: 'findPendingJobs'},

@@ -121,7 +121,7 @@ module.exports = require('../vent').extend({
 
       client.insertPullRequestJob(prJob.pull, prJob.job);
       this.publish("pull_request.build_stored", prJob.pull);
-      
+
     }.bind(this))
     .catch(this.log.error(this.error))
     .done();

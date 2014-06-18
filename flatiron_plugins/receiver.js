@@ -13,7 +13,7 @@ module.exports = plugin = {
   },
 
   init: function(done) {
-    this.receiver.setReceiver('github');
+    this.receiver.setReceiver(this.config.get('receiver').client);
     done();
   }
 };

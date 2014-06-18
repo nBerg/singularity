@@ -348,11 +348,11 @@ module.exports = require('../../vent').extend({
     return pull;
   },
 
-  handleRetest: function(payload) {
-    console.log("HERE");
-    this.log.debug("here");
+  validateRetest: function(payload) {
     //just assume all retests issue comments for now
-    this.handleIssueComment(payload);
+    var validated = this.handleIssueComment(payload);
+
+    return validated;
   },
 
   /**
@@ -366,10 +366,22 @@ module.exports = require('../../vent').extend({
     // This event will pick up comments on issues and pull requests but we only care about pull requests
     if (comment.issue.pull_request.html_url == null) {
       this.log.debug('Ignoring non-pull request issue notification');
-      return;
+      return false;
     }
 
-    if (!~comment.comment.body.indexOf('@' + this.config.auth.username + ' retest')) { return; }
+    var commentArray = comment.comment.body.split(' '),
+        addressedIndex = commentArray.indexOf('@' + this.config.auth.username),
+        command = commentArray[addressedIndex + 1];
+
+    if (!~addressedIndex) {
+      this.log.debug("Ignoring comment not addressed to me");
+      return false;
+    }
+
+    if (command !== 'retest') {
+      this.log.debug("Ignoring uknown request: " + comment.comment.body);
+      return false;
+    }
 
     this.log.debug('Received retest request for pull', { pull_number: comment.issue.number, repo: comment.repository.name });
 
@@ -380,32 +392,32 @@ module.exports = require('../../vent').extend({
     })
     .then(function(pull) {
       pull.issue_comment = true;
-      this.publish('pull_request', pull);
+      return true;
     }.bind(this))
     .catch(this.error);
   },
-//
-//   /**
-//    * Processes & validates push events
-//    *
-//    * @method handlePush
-//    * @param payload {Object}
-//    */
-//   handlePush: function(push) {
-//     if (!push.repository ||
-//         !push.repository.name ||
-//         !push.ref ||
-//         !push.before ||
-//         !push.after ||
-//         !push.pusher ||
-//         !push.pusher.name ||
-//         !push.pusher.email) {
-//       this.error('Invalid push payload event', push);
-//       return;
-//     }
-//
-//     this.publish('push.validated', push);
-//   },
+
+  /**
+   * Processes & validates push events
+   *
+   * @method handlePush
+   * @param payload {Object}
+   */
+  validatePush: function(push) {
+    if (!push.repository ||
+        !push.repository.name ||
+        !push.ref ||
+        !push.before ||
+        !push.after ||
+        !push.pusher ||
+        !push.pusher.name ||
+        !push.pusher.email) {
+      this.error('Invalid push payload event', push);
+      return false;
+    }
+
+    return true;
+  },
 //
 //   /**
 //    * Create / configure webhooks for a given list of repos
