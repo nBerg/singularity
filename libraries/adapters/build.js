@@ -47,7 +47,7 @@ module.exports = require('../vent').extend({
   },
 
   start: function() {
-    if (this.config.method === 'hooks') {
+    if (this.config.get('method') === 'hooks') {
       this.publish('build.polling');
       return;
     }

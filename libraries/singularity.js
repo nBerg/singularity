@@ -98,6 +98,12 @@ function standardizeConfig(config) {
     };
   }
 
+  if (!config.build) {
+    config.build = {
+      method: 'hooks'
+    };
+  }
+
   if (!config.github) {
     config.github = {};
   }
