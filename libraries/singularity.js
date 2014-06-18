@@ -75,68 +75,6 @@ function dispatchRoutes(routes) {
 }
 
 /**
- * Given a config, fills in the blanks that are required
- *
- * @param {Object} config
- * @return {Object} updated config
- */
-function standardizeConfig(config) {
-  if (!config) {
-    config = {};
-  }
-
-  if (!config.port) {
-    config.port = 8080;
-  }
-
-  if (!config.log) {
-    config.log = {
-      console: {
-        level: 'debug',
-        colorize: true
-      }
-    };
-  }
-
-  if (!config.build) {
-    config.build = {
-      client: 'jenkins',
-      method: 'hooks',
-      jenkins: {
-        projects: [],
-        push_projects: []
-      }
-    };
-  }
-
-  if (!config.db) {
-    config.db = {
-      client: 'memory',
-      memory: {}
-    };
-  }
-
-  if (!config.github) {
-    config.github = {
-      method: 'hooks'
-    };
-  }
-
-  if (!config.github.repos) {
-    config.github.repos = [];
-  }
-
-  if (!config.cache) {
-    config.cache = {
-      max: 64,
-      maxAge: 60 * 1000
-    };
-  }
-
-  return config;
-}
-
-/**
  * Generates flatiron plugin name from a filename
  *
  * @param {String} file
@@ -196,7 +134,7 @@ function appUsePlugin(file, cfg) {
 
 var Singularity = require('nbd/Class').extend({
   init: function() {
-    app.config.defaults(standardizeConfig({}));
+    app.config.defaults(require('./config'));
     app.init();
     this.log = app.log.get('console');
     this.eventMapper = new EventMapper();
