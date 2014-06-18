@@ -53,7 +53,6 @@ function handleRequest(request, app) {
   .then(function(request) {
     var req = app.receiver.handleRequest(request);
 
-
     var meta = {};
     // meta['github.' + request.headers['x-github-event']] = data;
     meta['hook.' + req.type] = req.data;
