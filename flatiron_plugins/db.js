@@ -14,7 +14,8 @@ module.exports = plugin = {
   },
 
   init: function(done) {
-    this.db.setClient(this.config.get('db.client') || 'memory');
+    this.db.setClient(this.config.get('db').client);
+
     done();
   }
 };
