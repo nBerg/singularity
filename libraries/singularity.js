@@ -100,25 +100,22 @@ function standardizeConfig(config) {
 
   if (!config.build) {
     config.build = {
-      method: 'hooks'
-    };
-  }
-
-  if (!config.github) {
-    config.github = {};
-  }
-
-  if (!config.github.repos) {
-    config.github.repos = [];
-  }
-
-  if (!config.build) {
-    config.build = {
+      method: 'hooks',
       jenkins: {
         projects: [],
         push_projects: []
       }
     };
+  }
+
+  if (!config.github) {
+    config.github = {
+      method: 'hooks'
+    };
+  }
+
+  if (!config.github.repos) {
+    config.github.repos = [];
   }
 
   if (!config.db) {
