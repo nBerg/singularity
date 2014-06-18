@@ -17,6 +17,7 @@ module.exports = require('../vent').extend({
   init: function(option) {
     option = require('nconf').defaults(option);
     this._super(option);
+    this.name = 'BuildAdapter';
   },
 
   // todo: DRY b/w here & adapters/db
