@@ -22,12 +22,12 @@ module.exports = require('../vent').extend({
   // todo: DRY b/w here & adapters/db
   setClient: function(client) {
     if (!this.config.get(client)) {
-      this.log.error('No config for db.<client>, ignoring', {client: client});
+      this.log.error('No config for build.<client>, ignoring', {client: client});
       return;
     }
 
     var clientPath = this.config.get('client_path') ||
-                     path.join(__dirname, '../builders/dbs/', client + '.js');
+                     path.join(__dirname, '../plugins/builders/', client + '.js');
     if (fs.existsSync(clientPath)) {
       var ClientObj = require(clientPath);
 
