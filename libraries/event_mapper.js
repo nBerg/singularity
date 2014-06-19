@@ -37,12 +37,6 @@ function packageMeta(meta) {
     // honestly have no idea if this resolves synchronously
     metaFields.forEach(function(field) {
       envelopes.push({
-        channel: 'workflow',
-        topic: field,
-        data: meta[field]
-      });
-
-      envelopes.push({
         channel: field.substring(0, field.indexOf('.')),
         topic: field.substring(field.indexOf('.') + 1, field.length),
         data: meta[field]

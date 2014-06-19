@@ -3,17 +3,20 @@
 // not a JSON file because...this needs comments
 
 module.exports = [
+    // PAYLOAD EVENTS
+    {channel: 'hook', topic: 'payload', vent: 'vcs', callback: 'handleRequest'},
+
     // PUSH CHAIN
-    {channel: 'hook', topic: 'push', vent: 'receiver', callback: 'handlePush'},
-    {channel: 'receiver', topic: 'push.validated', vent: 'db', callback: 'findPush'},
+    {channel: 'hook', topic: 'push', vent: 'vcs', callback: 'handlePush'},
+    {channel: 'vcs', topic: 'push.validated', vent: 'db', callback: 'findPush'},
     {channel: 'db', topic: 'push.not_found', vent: 'build', callback: 'buildPush'},
     {channel: 'build', topic: 'push.triggered', vent: 'db', callback: 'insertPush'},
 
     // PULL REQUEST CHAIN
     // incoming from *some* source (hook, issue_comment, w/e) & then validate that this is a payload
     // that we should trigger a build for
-    {channel: 'hook', topic: 'pull_request', vent: 'receiver', callback: 'handlePullRequest'},
-    {channel: 'receiver', topic: 'pull_request.validated', vent: 'db', callback: 'findPullRequest'},
+    {channel: 'hook', topic: 'pull_request', vent: 'vcs', callback: 'handlePullRequest'},
+    {channel: 'vcs', topic: 'pull_request.validated', vent: 'db', callback: 'findPullRequest'},
     // pull_request on record - update stored PR fields & trigger build
     {channel: 'db', topic: 'pull_request.updated', vent: 'db', callback: 'updatePullRequest'},
     {channel: 'db', topic: 'pull_request.updated', vent: 'build', callback: 'buildPullRequest'},
@@ -31,9 +34,9 @@ module.exports = [
     // equivalent to the `pullChain`
     // i.e.: `handleIssueComment()` must publish data that is isometric to a regular pull_request
     //       event payload
-    {channel: 'receiver', topic: 'issue_comment', vent: 'receiver', callback: 'handleIssueComment'},
-    {channel: 'hook', topic: 'retest', vent: 'receiver', callback: 'handleRetest'},
-    {channel: 'receiver', topic: 'pull_request.retest', vent: 'build', callback: 'buildPullRequest'},
+    {channel: 'vcs', topic: 'issue_comment', vent: 'vcs', callback: 'handleIssueComment'},
+    {channel: 'hook', topic: 'retest', vent: 'vcs', callback: 'handleRetest'},
+    {channel: 'vcs', topic: 'pull_request.retest', vent: 'build', callback: 'buildPullRequest'},
     {channel: 'recevier', topic: 'push.retest', vent: 'build', callback: 'buildPush'},
 
     // BUILD CHAIN
@@ -44,10 +47,10 @@ module.exports = [
     // job status change - update DB
     {channel: 'build', topic: 'pull_request.build_updated', vent: 'db', callback: 'updatePullRequestJob'},
     {channel: 'build', topic: 'push.build_updated', vent: 'db', callback: 'updatePushJob'},
-    // pull_request.build.* => build status update in DB that should be written to receiver
-    {channel: 'db', topic: 'pull_request.build.*', vent: 'receiver', callback: 'createStatus'},
+    // pull_request.build.* => build status update in DB that should be written to vcs
+    {channel: 'db', topic: 'pull_request.build.*', vent: 'vcs', callback: 'createStatus'},
 
     // CONFIG EVENTS
-    {channel: 'receiver', topic: 'config', vent: 'receiver', callback: 'addRepo'},
+    {channel: 'vcs', topic: 'config', vent: 'vcs', callback: 'addRepo'},
     {channel: 'build', topic: 'config', vent: 'build', callback: 'addProject'}
 ];
