@@ -175,12 +175,17 @@ module.exports = function(config, log) {
     return selectData;
   };
 
-  app.addRepoPRJob = function(params) {
+  app.addRepo = function(params) {
     if (app.config.plugins.github.repos.indexOf(params.repo) !== -1) {
       app.log.info('duplicate github repo', params);
       return false;
     }
 
+    app.emit('github.new_repo', params.repo);
+    return true;
+  };
+
+  app.addRepoPRJob = function(params) {
     var duplicate = app.config.plugins.jenkins.projects.some(function(project) {
       return (params.project === project.name || params.repo === project.repo);
     });
@@ -190,8 +195,31 @@ module.exports = function(config, log) {
       return false;
     }
 
-    app.emit('github.new_repo', params.repo);
+    app.addRepo(params);
+
     app.emit('jenkins.new_pr_job', {
+      name: params.project,
+      repo: params.repo,
+      token: params.token || false
+    });
+    app.log.info('Singularity: runtime config updated');
+
+    return true;
+  };
+
+  app.addRepoPushJob = function(params) {
+    var duplicate = app.config.plugins.jenkins.push_projects.some(function(project) {
+      return (params.project === project.name || params.repo === project.repo);
+    });
+
+    if (duplicate) {
+      app.log.info('duplicate jenkins repo or project', params);
+      return false;
+    }
+
+    app.addRepo(params);
+
+    app.emit('jenkins.new_push_job', {
       name: params.project,
       repo: params.repo,
       token: params.token || false

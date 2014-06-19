@@ -26,5 +26,22 @@ exports.init = function(app) {
     response.send(200, response_obj);
   });
 
+  route.post('/push', function(request, response, next) {
+    var response_obj = {
+      success: true
+    };
+
+    ['organization', 'repo', 'project'].forEach(function(param) {
+      if (!request.body[param]) {
+        app.log.error('missing parameter: ' + param);
+        response.send(400, response_obj);
+        return;
+      }
+    });
+
+    app.addRepoPushJob(request.body);
+    response.send(200, response_obj);
+  });
+
   return route;
 };
