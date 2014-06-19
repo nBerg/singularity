@@ -10,11 +10,6 @@ module.exports = require('./adapter').extend({
     this._super(option);
   },
 
-  setPublisher: function(source) {
-    // TODO: do this smarter
-    publisher = require('../plugins/publishers/' + source);
-  },
-
   createStatus: function(status) {
     this.log.debug('creating status - not implemented');
   }
