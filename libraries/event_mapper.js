@@ -95,6 +95,7 @@ function validateTrigger(trigger) {
 module.exports = require('nbd/Class').extend({
   init: function(option) {
     this.log = app.log.get('console');
+    this.react.bind(this);
     postal.subscribe({
       channel: 'workflow',
       topic: '*',

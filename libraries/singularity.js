@@ -1,84 +1,9 @@
 var EventMapper = require('./event_mapper'),
+    Receiver = require('./receiver'),
     q = require('q'),
     app = require('flatiron').app,
     fs = require('fs'),
     path = require('path');
-
-/**
- * Used to safely wrap function ret vals & respond to requests
- *
- * @param {Object} route A function that returns *some* object
- * @return {Object} A promise
- */
-function requestWrapper(route) {
-  var deferred = q.defer();
-  deferred.resolve(this.req);
-
-  var self = this,
-
-      // TODO: Redo when we figure stuffs out
-      retval = deferred.promise.then(function(req) {
-        return route(req, app);
-      }),
-      writeResponse = function(defaultStatus, meta) {
-        self.res.statusCode = meta.status || defaultStatus;
-        self.res.writeHead(meta.body || meta);
-        self.res.write(JSON.stringify(meta.body || meta));
-        self.res.end();
-      };
-
-  retval.done(function(meta) {
-    app.log.info('done success');
-    writeResponse(200, meta);
-  }, function(meta) {
-    app.log.info('done failure');
-    writeResponse(500, meta);
-  });
-
-  return retval;
-}
-
-/**
- * Given a path and a route object, build the arguments
- * needed to add to the router.
- *
- * @param {string} path        the path
- * @param {Object|[]} routes   object with route callback and method
- * @param {Object} EventMapper object to pass generated route
- *                             metadata to
- * @return [{Object}] router arguments object
- */
-function buildRoutes(path, routes, eventHandler) {
-  if (!Array.isArray(routes)) {
-    routes = [routes];
-  }
-
-  var routePromises = routes.map(function(route) {
-    var defer = q.defer();
-    defer.resolve([
-      route.method || 'get',
-      path,
-      function() {
-        requestWrapper.call(this, route)
-        .then(eventHandler.react.bind(eventHandler));
-      }
-    ]);
-    return defer.promise;
-  });
-
-  return q.all(routePromises);
-}
-
-/**
- * Add a route to the router.
- *
- * @param {Object[]} routes array args for router.on()
- */
-function dispatchRoutes(routes) {
-  routes.forEach(function(route) {
-    app.router.on.apply(app.router, route);
-  });
-}
 
 /**
  * Generates flatiron plugin name from a filename
@@ -144,19 +69,20 @@ var Singularity = require('nbd/Class').extend({
     app.init();
     this.log = app.log.get('console');
     this.eventMapper = new EventMapper();
+    this.receiver = new Receiver();
   },
 
   route: function(routes) {
     if (routes == null) { return; }
 
-    var self = this,
-    promises = Object.keys(routes)
-    .map(function(path) {
-      return buildRoutes(path, routes[path], self.eventMapper)
-      .then(dispatchRoutes);
+    Object.keys(routes)
+    .forEach(function(path) {
+      this.receiver.buildRoutes(
+        path,
+        routes[path],
+        this.eventMapper
+      );
     }, this);
-
-    return q.allSettled(promises).done();
   },
 
   mapTriggers: function(triggers) {
@@ -179,7 +105,10 @@ var Singularity = require('nbd/Class').extend({
           ])
         )
         .spread(function(path, name) {
-          self.log.debug('[flatiron_plugin.load]', {name: name, path: path});
+          self.log.debug(
+            '[flatiron_plugin.load]',
+            {name: name, path: path}
+          );
           return q.all([path, pluginConfig(name)]);
         })
         .spread(appUsePlugin)
