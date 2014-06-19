@@ -30,12 +30,11 @@ function buildPullRequestRecord(pull) {
   };
 }
 
-module.exports = require('../vent').extend({
+module.exports = require('./adapter').extend({
   init: function(option) {
-    // TODO: think about putting this into vent instead
-    option = require('nconf').defaults(option);
+    this.name = 'db';
+    this.pluginType = 'dbs';
     this._super(option);
-    this.name = 'DBAdapter';
   },
 
   setClient: function(client) {
