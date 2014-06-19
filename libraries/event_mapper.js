@@ -61,7 +61,7 @@ function packageMeta(meta) {
  * @return {Object} A promise
  */
 function createTrigger(trigger) {
-  app.log.get('console').debug('Adding trigger.', trigger);
+  app.log.get('console').debug('[trigger.add]', trigger);
 
   var channelObj = postal.channel(trigger.channel),
   callback = function(data, envelope) {
@@ -95,6 +95,14 @@ function validateTrigger(trigger) {
 module.exports = require('nbd/Class').extend({
   init: function(option) {
     this.log = app.log.get('console');
+    postal.subscribe({
+      channel: 'workflow',
+      topic: '*',
+      callback: function(data, envelope) {
+        console.log(data);
+        console.log(envelope);
+      }
+    });
   },
 
   react: function(data) {

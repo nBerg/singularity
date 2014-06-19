@@ -51,7 +51,7 @@ function handleRequest(request, app) {
   return q(request)
   .then(ipCheck)
   .then(function(request) {
-    var req = app.receiver.handleRequest(request);
+    var req = app.vcs.handleRequest(request);
 
     var meta = {};
     // meta['github.' + request.headers['x-github-event']] = data;

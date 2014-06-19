@@ -1,20 +1,13 @@
 "use strict";
 
-var // q = require('q'),
-    // async = require('async'),
+var q = require('q'),
     publisher;
 
-module.exports = require('../vent').extend({
+module.exports = require('./adapter').extend({
   init: function(option) {
+    this.name = 'publish';
+    this.pluginType = 'publishers';
     this._super(option);
-  },
-
-  start: function() {
-  },
-
-  setPublisher: function(source) {
-    // TODO: do this smarter
-    publisher = require('../plugins/publishers/' + source);
   },
 
   createStatus: function(status) {

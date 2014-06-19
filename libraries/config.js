@@ -5,26 +5,23 @@ module.exports = {
   port: 8080,
   log: {
     console: {
-      level: 'debug',
-      colorize: true
+      level: 'info',
+      colorize: false
     }
   },
   build: {
-    client: 'jenkins',
-    method: 'hooks',
+    plugin: 'jenkins',
     jenkins: {
+      method: 'hooks',
       projects: [],
       push_projects: []
     }
   },
-  db: {
-    client: 'memory',
-    memory: {}
-  },
-  receiver: {
-    client: 'github',
-    method: 'hooks',
+  db: {},
+  vcs: {
+    plugin: 'github',
     github: {
+      method: 'hooks',
       repos: []
     }
   },

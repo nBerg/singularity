@@ -1,44 +1,17 @@
 "use strict";
 
 var q = require('q'),
-    // async = require('async'),
-
-    // TODO: Keep these concepts? or rename?
     allowed_events = ['pull_request', 'retest', 'push'];
 
-module.exports = require('../vent').extend({
-  receiver: undefined,
-
+module.exports = require('./adapter').extend({
   init: function(option) {
-    // TODO: think about putting this into vent instead
-    option = require('nconf').defaults(option);
+    this.name = 'vcs';
+    this.pluginType = 'vcs';
     this._super(option);
-  },
-
-  setReceiver: function(plugin) {
-    var Receiver = require('../plugins/receivers/' + plugin);
-
-    q.fcall(function() {
-      var r = new Receiver(this.config.get(plugin));
-      r.log = this.log;
-
-      return r;
-    }.bind(this))
-    .then(function(instance) {
-      this.receiver = instance;
-    }.bind(this))
-    .catch(this.log.error(this.error))
-    .done();
-
-    return;
-  },
-
-  start: function() {
   },
 
   eventCheck: function(request) {
     var eventType = this.receiver.parseEvent(request);
-
     if (!~allowed_events.indexOf(eventType)) {
       throw {
           status: 501,
@@ -47,9 +20,7 @@ module.exports = require('../vent').extend({
           }
       };
     }
-
     this.log.debug('Event type ' + eventType + ' detected');
-
     return eventType;
   },
 

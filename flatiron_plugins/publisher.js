@@ -1,19 +1,18 @@
 "use strict";
 
-var plugin,
-Publisher = require('../libraries/adapters/publisher');
+var Publisher = require('../libraries/adapters/publisher'),
+plugin;
 
-// TODO: refactor so that it's easy to swap this out with other DB libs
 module.exports = plugin = {
   name: 'Publisher',
 
   attach: function(options) {
     this.publisher = new Publisher(options);
     this.publisher.log = this.log.get('console');
+    this.publisher.attachConfigPlugins();
   },
 
   init: function(done) {
-    this.publisher.setPublisher('github');
     done();
   }
 };
