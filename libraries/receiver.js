@@ -12,17 +12,15 @@ function requestWrapper(route) {
   deferred.resolve(this.req);
 
   var self = this,
-
-      // TODO: Redo when we figure stuffs out
-      retval = deferred.promise.then(function(req) {
-        return route(req, app);
-      }),
-      writeResponse = function(defaultStatus, meta) {
-        self.res.statusCode = meta.status || defaultStatus;
-        self.res.writeHead(meta.body || meta);
-        self.res.write(JSON.stringify(meta.body || meta));
-        self.res.end();
-      };
+  retval = deferred.promise.then(function(req) {
+    return route(req);
+  }),
+  writeResponse = function(defaultStatus, meta) {
+    self.res.statusCode = meta.status || defaultStatus;
+    self.res.writeHead(meta.body || meta);
+    self.res.write(JSON.stringify(meta.body || meta));
+    self.res.end();
+  };
 
   retval.done(function(meta) {
     app.log.info('done success');
