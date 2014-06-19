@@ -176,9 +176,12 @@ var Singularity = require('nbd/Class').extend({
           q.all([
             path.join(dir, file),
             pluginNameFromFile(file)
-            .then(pluginConfig)
           ])
         )
+        .spread(function(path, name) {
+          self.log.debug('[flatiron_plugin.load]', {name: name, path: path});
+          return q.all([path, pluginConfig(name)]);
+        })
         .spread(appUsePlugin)
         .catch(self.log.error.bind(self));
       });

@@ -115,6 +115,10 @@ module.exports = require('../vent').extend({
       });
     }
     plugins.forEach(function(plugin) {
+      this.log.debug(
+        '[adapter.' + this.name + '.plugin_load]',
+        {plugin: plugin}
+      );
       this.attachPlugin(plugin);
     }, this);
   },
@@ -144,14 +148,26 @@ module.exports = require('../vent').extend({
    */
   delegateTask: function(fx, args) {
     args = args || [];
-    return q.allSettled(
-      this.plugins.map(function(plugin) {
-        return q.resolve(plugin)
-        .invoke(fx, args)
-        .catch(plugin.error)
-        .done();
-      });
-    )
+    var self = this,
+    promises = this.plugins.map(function(plugin) {
+      return q.resolve(plugin)
+      .then(function(plugin) {
+        self.log.debug(
+          '[adapter.delegateTask]',
+          {
+            task: fx,
+            args: args,
+            plugin: plugin
+          }
+        );
+        return plugin;
+      })
+      .invoke(fx, args)
+      .catch(plugin.error)
+      .done();
+    });
+
+    q.allSettled(promises)
     .catch(this.error)
     .done();
   }
