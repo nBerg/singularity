@@ -5,8 +5,8 @@ module.exports = {
   port: 8080,
   log: {
     console: {
-      level: 'debug',
-      colorize: true
+      level: 'info',
+      colorize: false
     }
   },
   build: {
@@ -18,7 +18,7 @@ module.exports = {
     }
   },
   db: {},
-  receiver: {
+  vcs: {
     plugin: 'github',
     github: {
       method: 'hooks',
