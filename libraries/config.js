@@ -10,21 +10,18 @@ module.exports = {
     }
   },
   build: {
-    client: 'jenkins',
-    method: 'hooks',
+    plugin: 'jenkins',
     jenkins: {
+      method: 'hooks',
       projects: [],
       push_projects: []
     }
   },
-  db: {
-    client: 'memory',
-    memory: {}
-  },
+  db: {},
   receiver: {
-    client: 'github',
-    method: 'hooks',
+    plugin: 'github',
     github: {
+      method: 'hooks',
       repos: []
     }
   },

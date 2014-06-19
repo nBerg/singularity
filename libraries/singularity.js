@@ -123,7 +123,7 @@ function pluginConfig(name) {
     defer.resolve(cfg);
   }
   else {
-    defer.reject('No config found for ' + name);
+    defer.reject('Singularity: no config found for adapter=' + name);
   }
   return defer.promise;
 }

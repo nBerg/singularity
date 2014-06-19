@@ -9,10 +9,10 @@ module.exports = plugin = {
   attach: function(options) {
     this.build = new BuildSys(options);
     this.build.log = this.log.get('console');
+    this.build.attachConfigPlugins();
   },
 
   init: function(done) {
-    this.build.setClient(this.config.get('build').client);
     this.build.start();
     done();
   }

@@ -1,5 +1,9 @@
 "use strict";
 
+var q = require('q'),
+path = require('path'),
+fs = require('fs');
+
 /**
  * MUST BIND `this`
  * Validates that a config for a plugin exists
@@ -9,7 +13,7 @@
  */
 function validatePluginCfg(plugin) {
   if (!this.config.get(plugin)) {
-    throw 'No config for ' + this.name + '.<plugin>';
+    throw 'No config for ' + this.name + '.' + plugin;
   }
   return this.config.get(plugin);
 }
@@ -39,9 +43,7 @@ function internalPluginPath(type, name) {
 function pathFromName(plugin) {
   var cfgPath = this.config.get('plugin_path'),
   filePath = internalPluginPath(this.pluginType, plugin);
-
   cfgPath = fs.existsSync(cfgPath) ? cfgPath : false;
-
   if (!cfgPath && !fs.existsSync(filePath)) {
     throw this.name +
           ' (' +
@@ -53,23 +55,32 @@ function pathFromName(plugin) {
   return (cfgPath) ? cfgPath : filePath;
 }
 
+/**
+ * MUST BIND `this`
+ * Attempts to load a plugin, pushes it into this.plugins
+ *
+ * @param {String} path Path of plugin to load
+ */
 function loadFromPath(path) {
   var klass = require(path);
   this.plugins.push(new klass(this.config.get(plugin)));
 }
 
 module.exports = require('../vent').extend({
+  // full array of all plugins for this adapter
   plugins: [],
 
   /**
-   *
+   * Typically called by an external force to start internal
+   * processes, such as polling
    */
   start: function() {
     this.error(this.name + ': no start() override');
   },
 
   /**
-   *
+   * {@inheritDoc}
+   * @param {Object} option Configuration
    */
   init: function(option) {
     if (!this.pluginType) {
@@ -83,10 +94,34 @@ module.exports = require('../vent').extend({
   },
 
   /**
+   * Given a config, attempts to load plugins based on it.
+   * If a `plugin` field exists, this fx will exclusively attempt
+   * to load that plugin
    *
+   * @param {undefined | Object} cfg Defaults to this.config.get()
+   */
+  attachConfigPlugins: function(cfg) {
+    var plugins,
+    cfg = cfg || this.config.get();
+    if (cfg.plugin) {
+      plugins = [cfg.plugin];
+    }
+    else {
+      plugins = Object.keys(cfg).filter(function(key) {
+        key !== 'plugin';
+      });
+    }
+    plugins.forEach(function(plugin) {
+      this.attachPlugin(plugin);
+    }, this);
+  },
+
+  /**
+   * @param {String} plugin Name of the plugin
+   * @return {Promise}
    */
   attachPlugin: function(plugin) {
-    return q.resolve(plugin)
+    q.resolve(plugin)
     .then(validatePluginCfg.bind(this))
     .thenResolve(plugin)
     .then(pathFromName.bind(this))

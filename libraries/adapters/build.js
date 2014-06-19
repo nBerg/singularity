@@ -1,7 +1,7 @@
 "use strict";
 
 var q = require('q'),
-async = require('async'),
+async = require('async');
 
 function validateOpts(opts) {
   return opts;
