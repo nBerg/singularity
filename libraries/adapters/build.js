@@ -14,24 +14,6 @@ module.exports = require('./adapter').extend({
     this._super(option);
   },
 
-  start: function() {
-    if (this.config.get('method') === 'hooks') {
-      this.publish('build.polling');
-      return;
-    }
-
-    var self = this;
-    async.parallel({
-      poll: function() {
-        var pingForPoll = function() {
-          self.publish('build.polling');
-          setTimeout(pingForPoll, self.config.frequency || 2000);
-        };
-        pingForPoll();
-      }
-    });
-  },
-
   checkPullRequestJob: function(pull) {
   },
 
@@ -39,23 +21,13 @@ module.exports = require('./adapter').extend({
   },
 
   triggerBuild: function(req_body) {
-    var self = this;
-
-    return this.plugins.forEach(function(builder) {
-      q.resolve(req_body)
-      .then(validateOpts)
-      .then(builder.triggerBuild)
-      .then(function(res) {
-        self.publish(
-          'build.triggered',
-          {
-            opts: req_body,
-            builder: builder.name
-          }
-        );
-      })
-      .catch(self.error)
-      .done();
-    });
+    return q.resolve(req_body)
+    .then(validateOpts)
+    .then(function(opts) {
+      return ['triggerBuild', opts];
+    })
+    .spread(this.delegateTask)
+    .catch(this.error)
+    .done();
   }
 });

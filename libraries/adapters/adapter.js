@@ -75,7 +75,7 @@ module.exports = require('../vent').extend({
    * processes, such as polling
    */
   start: function() {
-    this.error(this.name + ': no start() override');
+    this.delegateTask('start');
   },
 
   /**
@@ -91,6 +91,7 @@ module.exports = require('../vent').extend({
     }
     option = require('nconf').defaults(option);
     this._super(option);
+    this.delegateTask.bind(this);
   },
 
   /**
@@ -104,7 +105,9 @@ module.exports = require('../vent').extend({
     var plugins,
     cfg = cfg || this.config.get();
     if (cfg.plugin) {
-      plugins = [cfg.plugin];
+      plugins = Array.isArray(cfg.plugin)
+                ? cfg.plugin
+                : [cfg.plugin];
     }
     else {
       plugins = Object.keys(cfg).filter(function(key) {
@@ -126,6 +129,29 @@ module.exports = require('../vent').extend({
     .thenResolve(plugin)
     .then(pathFromName.bind(this))
     .then(loadFromPath.bind(this))
+    .catch(this.error)
+    .done();
+  },
+
+  /**
+   * Delegates a fx call & args to all attached plugins
+   *
+   * @param {String} fx The function to call on each plugin
+   * @param {Array} args Arguements to invoke fx with, defauts
+   *                     to an empty array
+   * @return {Promise} Array of promises, an element for each
+   *                   call on plugin.fx
+   */
+  delegateTask: function(fx, args) {
+    args = args || [];
+    return q.allSettled(
+      this.plugins.map(function(plugin) {
+        return q.resolve(plugin)
+        .invoke(fx, args)
+        .catch(plugin.error)
+        .done();
+      });
+    )
     .catch(this.error)
     .done();
   }
