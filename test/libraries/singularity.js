@@ -249,7 +249,7 @@ describe('libraries/singularity', function() {
     });
 
     it('actually updates properly', function() {
-      var args = { repo: 'new_test_repo', project: 'new_test_project' },
+      var args = { repo: 'new_test_repo', project: 'new_test_project', rules: ['^master$'] },
           spy = sinon.spy();
 
       sinon.stub(self.app, 'addRepo', spy);

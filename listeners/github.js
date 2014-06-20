@@ -31,6 +31,12 @@ var GitHub = function(config, application, events) {
 
   self.api.authenticate(config.auth);
 
+  self.application.on('github.config_reload', function(new_config) {
+    self.config = new_config;
+    self.application.log.info('github: reloaded config');
+    self.application.emit('singularity.configuration.updated', 'github');
+  });
+
   self.application.on('github.new_repo', function(repo) {
     self.setupRepoHook(repo, function(err, res) {
       // log error but still store repo - no harm & makes it easier to sync up configs between plugins

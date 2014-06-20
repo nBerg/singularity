@@ -222,7 +222,10 @@ module.exports = function(config, log) {
     app.emit('jenkins.new_push_job', {
       name: params.project,
       repo: params.repo,
-      token: params.token || false
+      token: params.token || false,
+      rules: params.rules.map(function(rule) {
+        return new RegExp(rule);
+      })
     });
     app.log.info('Singularity: runtime config updated');
 
@@ -247,6 +250,52 @@ module.exports = function(config, log) {
       app.log.info('Singularity: saved config into DB', { notifying_plugin: plugin });
     });
   });
+
+  app.removeRepoConfigs = function(repo) {
+    var pr_projects = app.config.plugins.jenkins.projects,
+    push_projects = app.config.plugins.jenkins.push_projects,
+    repos = app.config.plugins.github.repos;
+    app.config.plugins.jenkins.projects = pr_projects.filter(function(project) {
+      return project.repo !== repo;
+    });
+    app.config.plugins.jenkins.push_projects = push_projects.filter(function(project) {
+      return project.repo !== repo;
+    });
+    app.config.plugins.github.repos.splice(repos.indexOf(repo), 1);
+    app.reloadConfigs();
+  };
+
+  app.removePushProjectConfigs = function() {
+    app.config.plugins.jenkins.push_projects = [];
+    app.reloadConfigs();
+  };
+
+  app.removePullProjectConfigs = function() {
+    app.config.plugins.jenkins.projects = [];
+    app.reloadConfigs();
+  };
+
+  app.removeProjectConfigs = function(project) {
+    if (!project) {
+      app.removePullProjectConfigs();
+      app.removePushProjectConfigs();
+      return;
+    }
+    var pr_projects = app.config.plugins.jenkins.projects,
+    push_projects = app.config.plugins.jenkins.push_projects;
+    app.config.plugins.jenkins.projects = pr_projects.filter(function(pjt) {
+      return pjt.name !== project;
+    });
+    app.config.plugins.jenkins.push_projects = push_projects.filter(function(pjt) {
+      return pjt.name !== project;
+    });
+    app.reloadConfigs();
+  };
+
+  app.reloadConfigs = function() {
+    app.emit('jenkins.config_reload', app.config.plugins.jenkins);
+    app.emit('github.config_reload', app.config.plugins.github);
+  };
 
   return app;
 };
