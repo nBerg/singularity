@@ -10,31 +10,15 @@ module.exports = require('./adapter').extend({
     this._super(option);
   },
 
-  eventCheck: function(request) {
-    var eventType = this.receiver.parseEvent(request);
-    if (!~allowed_events.indexOf(eventType)) {
-      throw {
-          status: 501,
-          body: {
-            message: 'Unsupported event type ' + eventType
-          }
-      };
-    }
-    this.log.debug('Event type ' + eventType + ' detected');
-    return eventType;
-  },
-
   handleRequest: function(payload) {
     this.log.debug(
       '[vcs.payload_received]',
       JSON.stringify(payload).substring(0, 64) + '...'
     );
-    return {
-      type: this.eventCheck(request),
-      data: this.receiver.handleRequest(request)
-    };
+    this.delegateTask('processPayload', payload);
   },
 
+  /**
   handlePullRequest: function(payload) {
     this.log.debug('handling pull_request');
 
@@ -71,4 +55,5 @@ module.exports = require('./adapter').extend({
       //bad/ignored retest event
     }
   }
+  **/
 });

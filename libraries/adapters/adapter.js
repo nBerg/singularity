@@ -4,6 +4,10 @@ var q = require('q'),
 path = require('path'),
 fs = require('fs');
 
+function adapterError(name, message) {
+  throw '[adapter.' + name + '] ' + message;
+}
+
 /**
  * MUST BIND `this`
  * Validates that a config for a plugin exists
@@ -45,12 +49,12 @@ function pathFromName(plugin) {
   filePath = internalPluginPath(this.pluginType, plugin);
   cfgPath = fs.existsSync(cfgPath) ? cfgPath : false;
   if (!cfgPath && !fs.existsSync(filePath)) {
-    throw this.name +
-          ' (' +
-          this.pluginType +
-          '): plugin_path cfg not defined (or does not exists) & ' +
-          filePath +
-          ' does not exist';
+    adapterError(
+      this.name,
+      'plugin_path cfg not defined (or does not exist) & ' +
+      filePath +
+      ' does not exist'
+    );
   }
   return (cfgPath) ? cfgPath : filePath;
 }
@@ -61,7 +65,7 @@ function pathFromName(plugin) {
  *
  * @param {String} path Path of plugin to load
  */
-function loadFromPath(path) {
+function loadFromPath(plugin, path) {
   var klass = require(path);
   this.plugins.push(new klass(this.config.get(plugin)));
 }
@@ -75,7 +79,7 @@ module.exports = require('../vent').extend({
    * processes, such as polling
    */
   start: function() {
-    this.delegateTask('start');
+    this.delegateTask('start', arguments);
   },
 
   /**
@@ -102,8 +106,10 @@ module.exports = require('../vent').extend({
    * @param {undefined | Object} cfg Defaults to this.config.get()
    */
   attachConfigPlugins: function(cfg) {
-    var plugins,
+    var self = this,
+    plugins,
     cfg = cfg || this.config.get();
+
     if (cfg.plugin) {
       plugins = Array.isArray(cfg.plugin)
                 ? cfg.plugin
@@ -114,13 +120,18 @@ module.exports = require('../vent').extend({
         key !== 'plugin';
       });
     }
-    plugins.forEach(function(plugin) {
-      this.log.debug(
-        '[adapter.' + this.name + '.plugin_load]',
-        {plugin: plugin}
-      );
-      this.attachPlugin(plugin);
-    }, this);
+
+    return q.allSettled(
+      plugins.map(function(plugin) {
+        self.log.debug(
+          '[adapter.' + self.name + '.plugin_load]',
+          {plugin: plugin}
+        );
+        return self.attachPlugin(plugin);
+      })
+    )
+    .then(self.start.bind(self))
+    .done();
   },
 
   /**
@@ -128,13 +139,15 @@ module.exports = require('../vent').extend({
    * @return {Promise}
    */
   attachPlugin: function(plugin) {
-    q.resolve(plugin)
+    return q.resolve(plugin)
     .then(validatePluginCfg.bind(this))
     .thenResolve(plugin)
     .then(pathFromName.bind(this))
-    .then(loadFromPath.bind(this))
-    .catch(this.error)
-    .done();
+    .then(function(path) {
+      return [plugin, path];
+    })
+    .spread(loadFromPath.bind(this))
+    .catch(this.error);
   },
 
   /**
@@ -147,7 +160,13 @@ module.exports = require('../vent').extend({
    *                   call on plugin.fx
    */
   delegateTask: function(fx, args) {
-    args = args || [];
+    if (this.plugins.length === 0) {
+      return q.resolve([this.name, 'no plugins to delegate to'])
+      .spread(adapterError)
+      .catch(this.error)
+      .done();
+    }
+    args = Array.isArray(args) ? args : [args]
     var self = this,
     promises = this.plugins.map(function(plugin) {
       return q.resolve(plugin)
@@ -156,18 +175,16 @@ module.exports = require('../vent').extend({
           '[adapter.delegateTask]',
           {
             task: fx,
-            args: args,
-            plugin: plugin
+            plugin: plugin.name
           }
         );
         return plugin;
       })
-      .invoke(fx, args)
-      .catch(plugin.error)
-      .done();
+      .post(fx, args)
+      .catch(self.error);
     });
 
-    q.allSettled(promises)
+    return q.allSettled(promises)
     .catch(this.error)
     .done();
   }

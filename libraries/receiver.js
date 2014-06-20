@@ -23,10 +23,8 @@ function requestWrapper(route) {
   };
 
   retval.done(function(meta) {
-    app.log.info('done success');
     writeResponse(200, meta);
   }, function(meta) {
-    app.log.info('done failure');
     writeResponse(500, meta);
   });
 

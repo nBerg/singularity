@@ -14,7 +14,7 @@ function parseRequest(body) {
   return data;
 }
 
-module.exports = function payload(event, request) {
+module.exports = function createRequestWrapper(event, request) {
   if (typeof event !== 'string') {
     throw 'event given not string';
   }
@@ -22,4 +22,4 @@ module.exports = function payload(event, request) {
   payload[event] = parseRequest(request.body);
   payload[event].__headers = request.headers;
   return payload;
-}
+};

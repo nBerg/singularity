@@ -10,7 +10,7 @@ function validateOpts(opts) {
 module.exports = require('./adapter').extend({
   init: function(option) {
     this.name = 'build';
-    this.pluginType = 'builder';
+    this.pluginType = 'builders';
     this._super(option);
   },
 

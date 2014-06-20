@@ -28,7 +28,6 @@ function publishEvents(events) {
 function packageMeta(meta) {
   return q.resolve(Object.keys(meta))
   .then(function(metaFields) {
-    var envelopes = [];
     // honestly have no idea if this resolves synchronously
     return metaFields.map(function(field) {
       return {

@@ -40,7 +40,7 @@ function preparePayload(request) {
     throw {
       status: 422,
       message: err.message
-    }
+    };
   }
   return pl;
 }
