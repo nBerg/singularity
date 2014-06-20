@@ -265,11 +265,20 @@ module.exports = function(config, log) {
     app.reloadConfigs();
   };
 
+  app.removePushProjectConfigs = function() {
+    app.config.plugins.jenkins.push_projects = [];
+    app.reloadConfigs();
+  };
+
+  app.removePullProjectConfigs = function() {
+    app.config.plugins.jenkins.projects = [];
+    app.reloadConfigs();
+  };
+
   app.removeProjectConfigs = function(project) {
     if (!project) {
-      app.config.plugins.jenkins.projects = [];
-      app.config.plugins.jenkins.push_projects = [];
-      app.reloadConfigs();
+      app.removePullProjectConfigs();
+      app.removePushProjectConfigs();
       return;
     }
     var pr_projects = app.config.plugins.jenkins.projects,

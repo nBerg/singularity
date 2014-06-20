@@ -58,6 +58,22 @@ exports.init = function(app) {
     response.send(200, response_obj);
   });
 
+  route.post('/remove_push_projects', function(request, response, next) {
+    var response_obj = {
+      success: true
+    };
+    app.removePushProjectConfigs();
+    response.send(200, response_obj);
+  });
+
+  route.post('/remove_pull_projects', function(request, response, next) {
+    var response_obj = {
+      success: true
+    };
+    app.removePullProjectConfigs();
+    response.send(200, response_obj);
+  });
+
   route.post('/remove_repo', function(request, response, next) {
     var response_obj = {
       success: true
