@@ -1,8 +1,8 @@
 "use strict";
 
 var q = require('q'),
-    app = require('flatiron').app,
-    postal = require('postal');
+app = require('flatiron').app,
+postal = require('postal');
 
 /**
  * Iterate through an array of postal envelopes & publish
@@ -26,24 +26,17 @@ function publishEvents(events) {
  * @return {Object} A promise
  */
 function packageMeta(meta) {
-  return q.fcall(function() {
-    return Object.keys(meta).filter(function(field) {
-      return !~['body', 'status'].indexOf(field);
-    });
-  })
+  return q.resolve(Object.keys(meta))
   .then(function(metaFields) {
     var envelopes = [];
-
     // honestly have no idea if this resolves synchronously
-    metaFields.forEach(function(field) {
-      envelopes.push({
+    return metaFields.map(function(field) {
+      return {
         channel: field.substring(0, field.indexOf('.')),
         topic: field.substring(field.indexOf('.') + 1, field.length),
         data: meta[field]
-      });
+      };
     });
-
-    return envelopes;
   });
 }
 
@@ -56,13 +49,11 @@ function packageMeta(meta) {
  */
 function createTrigger(trigger) {
   app.log.get('console').debug('[trigger.add]', trigger);
-
   var channelObj = postal.channel(trigger.channel),
   callback = function(data, envelope) {
     app.log.get('console').debug('[channel.topic -> vent.callback]', trigger);
     app[trigger.vent][trigger.callback](data);
   };
-
   channelObj.subscribe(trigger.topic, callback);
 }
 
@@ -90,14 +81,6 @@ module.exports = require('nbd/Class').extend({
   init: function(option) {
     this.log = app.log.get('console');
     this.react.bind(this);
-    postal.subscribe({
-      channel: 'workflow',
-      topic: '*',
-      callback: function(data, envelope) {
-        console.log(data);
-        console.log(envelope);
-      }
-    });
   },
 
   react: function(data) {

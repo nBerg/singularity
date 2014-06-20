@@ -1,7 +1,7 @@
 "use strict";
 
 var q = require('q'),
-    allowed_events = ['pull_request', 'retest', 'push'];
+allowed_events = ['pull_request', 'retest', 'push'];
 
 module.exports = require('./adapter').extend({
   init: function(option) {
@@ -24,9 +24,11 @@ module.exports = require('./adapter').extend({
     return eventType;
   },
 
-  handleRequest: function(request) {
-    this.log.debug('handling new request');
-
+  handleRequest: function(payload) {
+    this.log.debug(
+      '[vcs.payload_received]',
+      JSON.stringify(payload).substring(0, 64) + '...'
+    );
     return {
       type: this.eventCheck(request),
       data: this.receiver.handleRequest(request)
