@@ -69,6 +69,7 @@ function loadFromPath(plugin, path) {
   var klass = require(path),
   instance = new klass(this.config.get(plugin));
   instance.log = this.log;
+  instance.setChannel(this.name);
   this.plugins.push(instance);
 }
 
@@ -98,6 +99,7 @@ module.exports = require('../vent').extend({
     option = require('nconf').defaults(option);
     this._super(option);
     this.delegateTask.bind(this);
+    this.setChannel(this.name);
   },
 
   /**

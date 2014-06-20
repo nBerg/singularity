@@ -24,6 +24,7 @@ module.exports = require('nbd/Class').extend({
   init: function(option) {
     this.config = option;
     this.error = this.error.bind(this);
+    this.setChannel = this.setChannel.bind(this);
   },
 
   error: function() {
