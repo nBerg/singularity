@@ -54,12 +54,6 @@ exports.init = function(app) {
     var response_obj = {
       success: true
     };
-    if (!request.body.project) {
-      response_obj.success = false;
-      response_obj.message = 'missing project param';
-      response.send(400, response_obj);
-      return;
-    }
     app.removeProjectConfigs(request.body.project);
     response.send(200, response_obj);
   });
@@ -70,7 +64,7 @@ exports.init = function(app) {
     };
     if (!request.body.repo) {
       response_obj.success = false;
-      response_obj.message = 'missing project repo';
+      response_obj.message = 'missing repo param';
       response.send(400, response_obj);
       return;
     }
