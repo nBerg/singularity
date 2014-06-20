@@ -13,7 +13,6 @@ module.exports = plugin = {
   },
 
   init: function(done) {
-    this.build.start();
     done();
   }
 };
