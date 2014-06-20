@@ -23,6 +23,12 @@ var Jenkins = function(config, application, idGen, requester) {
   self.config = config;
   self.application = application;
 
+  self.application.on('jenkins.config_reload', function(new_config) {
+    self.config = new_config;
+    self.application.log.info('jenkins: reloaded config');
+    self.application.emit('singularity.configuration.updated', 'jenkins');
+  });
+
   self.application.on('jenkins.new_pr_job', function(job) {
     // yay for references - directly updates in application config :|
     self.config.projects.push(job);
