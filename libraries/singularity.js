@@ -261,7 +261,7 @@ module.exports = function(config, log) {
     app.config.plugins.jenkins.push_projects = push_projects.filter(function(project) {
       return project.repo !== repo;
     });
-    app.config.plugins.github.repos.splice(repos.indexOf(repos), 1);
+    app.config.plugins.github.repos.splice(repos.indexOf(repo), 1);
     app.reloadConfigs();
   };
 
