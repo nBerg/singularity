@@ -66,8 +66,10 @@ function pathFromName(plugin) {
  * @param {String} path Path of plugin to load
  */
 function loadFromPath(plugin, path) {
-  var klass = require(path);
-  this.plugins.push(new klass(this.config.get(plugin)));
+  var klass = require(path),
+  instance = new klass(this.config.get(plugin));
+  instance.log = this.log;
+  this.plugins.push(instance);
 }
 
 module.exports = require('../vent').extend({
