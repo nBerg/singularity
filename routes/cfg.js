@@ -58,7 +58,7 @@ exports.init = function(app) {
     response.send(200, response_obj);
   });
 
-  route.post('/remove_repos', function(request, response, next) {
+  route.post('/remove_repo', function(request, response, next) {
     var response_obj = {
       success: true
     };
