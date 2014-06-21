@@ -31,10 +31,9 @@ module.exports = require('nbd/Class').extend({
   },
 
   error: function() {
-    var args = Array.prototype.slice.call(arguments);
-    args[0] = (typeof args[0] === 'string')
-              ? args[0]
-              : args[0].toString();
+    var args = Array.prototype.slice.call(arguments),
+    firstString = (typeof args[0] === 'string');
+    args[0] =  firstString ? args[0] : args[0].toString();
     this.log.error.apply(this.log, args);
   }
 });
