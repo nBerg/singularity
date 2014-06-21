@@ -4,11 +4,8 @@ var q = require('q'),
 allowed_events = ['pull_request', 'retest', 'push'];
 
 module.exports = require('./adapter').extend({
-  init: function(option) {
-    this.name = 'vcs';
-    this.pluginType = 'vcs';
-    this._super(option);
-  },
+  name: 'vcs',
+  pluginType: 'vcs',
 
   handleRequest: function(payload) {
     this.log.debug(
