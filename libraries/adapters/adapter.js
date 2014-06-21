@@ -4,6 +4,12 @@ var q = require('q'),
 path = require('path'),
 fs = require('fs');
 
+/**
+ * Util fx to throw errors with a nice "tag"
+ *
+ * @param {String} name
+ * @param {*} message
+ */
 function adapterError(name, message) {
   throw '[adapter.' + name + '] ' + message;
 }
@@ -74,9 +80,6 @@ function loadFromPath(plugin, path) {
 }
 
 module.exports = require('../vent').extend({
-  // full array of all plugins for this adapter
-  plugins: [],
-
   /**
    * Typically called by an external force to start internal
    * processes, such as polling
@@ -98,7 +101,9 @@ module.exports = require('../vent').extend({
     }
     option = require('nconf').defaults(option);
     this._super(option);
-    this.delegateTask.bind(this);
+    this.delegateTask = this.delegateTask.bind(this);
+    this.start = this.start.bind(this);
+    this.plugins = [];
     this.setChannel(this.name);
   },
 
@@ -134,7 +139,7 @@ module.exports = require('../vent').extend({
         return self.attachPlugin(plugin);
       })
     )
-    .then(self.start.bind(self))
+    .then(self.start)
     .done();
   },
 
@@ -174,15 +179,16 @@ module.exports = require('../vent').extend({
     var self = this,
     promises = this.plugins.map(function(plugin) {
       return q.resolve(plugin)
-      .then(function(plugin) {
+      .then(function(instance) {
         self.log.debug(
           '[adapter.delegateTask]',
           {
             task: fx,
-            plugin: plugin.name
+            adapter: self.name,
+            plugin: instance.name
           }
         );
-        return plugin;
+        return instance;
       })
       .post(fx, args)
       .catch(self.error);
