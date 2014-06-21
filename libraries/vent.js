@@ -15,7 +15,10 @@ module.exports = require('nbd/Class').extend({
 
   publish: function(topic, data) {
     if (!this.channel) {
-      this.error('cannot publish topic, no channel', {topic: topic, vent: this.name});
+      this.error(
+        'cannot publish topic, no channel',
+        {topic: topic, vent: this.name}
+      );
       return;
     }
     this.channel.publish(topic, data);
@@ -28,6 +31,10 @@ module.exports = require('nbd/Class').extend({
   },
 
   error: function() {
-    this.log.error.apply(this.log, Array.prototype.slice.call(arguments));
+    var args = Array.prototype.slice.call(arguments);
+    args[0] = (typeof args[0] === 'string')
+              ? args[0]
+              : args[0].toString();
+    this.log.error.apply(this.log, args);
   }
 });
