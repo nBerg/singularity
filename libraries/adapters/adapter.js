@@ -104,7 +104,6 @@ module.exports = require('../vent').extend({
     this.delegateTask = this.delegateTask.bind(this);
     this.start = this.start.bind(this);
     this.plugins = [];
-    this.setChannel(this.name);
   },
 
   /**
