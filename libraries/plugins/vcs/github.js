@@ -3,11 +3,17 @@ async = require('async'),
 q = require('q'),
 allowed_events = ['issue_comment', 'pull_request', 'push'];
 
-function throwError(message) {
-  throw '[vcs.github] ' + message;
+function logMsg(message) {
+  return '[vcs.github] ' + message;
 }
 
-module.exports = require('../../vent').extend({
+function throwError(message) {
+  throw logMsg(message);
+}
+
+module.exports = require('../plugin').extend({
+  name: 'github',
+
   init: function(option) {
     this._super(option);
     this._api = new GitHubApi({
@@ -16,7 +22,6 @@ module.exports = require('../../vent').extend({
       port: option.port
     });
     this.authenticate();
-    this.name = 'github';
   },
 
   authenticate: function() {
@@ -37,28 +42,128 @@ module.exports = require('../../vent').extend({
         '"'
       );
     }
+    this.publish('pull_request', payload);
   },
 
   start: function() {
     if (this.config.method === 'hooks') {
-      this.checkRepos();
+      this.debug(logMsg('using hooks, performing startup PR scan.'));
+      this.pollRepos();
       return;
     }
-    var self = this;
+    var self = this,
+    frequency = self.config.frequency || 4000;
     async.parallel({
       github: function() {
         var run_github = function() {
-          self.checkRepos();
-          setTimeout(run_github, self.config.frequency);
+          self.pollRepos();
+          setTimeout(run_github, frequency);
         };
         run_github();
       }
     });
   },
 
-  checkRepos: function() {
+  /**
+   * Iterates over the configured list of repositories and uses
+   * the GitHub API to check each one for pull requests.
+   *
+   * @method pollRepos
+   */
+  pollRepos: function() {
+    return q.allSettled(this.config.repos.map(function(repo) {
+      var repo_owner = repo.split('/')[0],
+      repo_name = repo.split('/')[1];
+      // Getting PRs for each repo
+      return q.ninvoke(this._api.pullRequests, 'getAll', {
+        user: repo_owner,
+        repo: repo_name,
+        state: 'open'
+      })
+      .then(function getPR(resp) {
+        return q.allSettled(Object.keys(resp)
+        .map(function(i) { return resp[i]; })
+        .filter(function(pull) {
+          return pull.number && pull.number !== 'undefined';
+        })
+        .map(function getPRDetails(pull) {
+          // Currently the GitHub API doesn't provide the same information for
+          // polling as it does when requesting a single, specific, pull request.
+          return q.ninvoke(this._api.pullRequests, 'get', {
+            user: repo_owner,
+            repo: repo_name,
+            number: pull.number
+          })
+          .then(function(pull) {
+            this.publish('pull_request', pull);
+          }.bind(this));
+        }, this));
+      }.bind(this))
+      .catch(this.error);
+    }, this));
+  },
 
-  }
+  /**
+   * Receives a pull request at the very beginning of the process, either from a webhook event or from the REST API,
+   * and checks to make sure we care about it.
+   *
+   * @method handlePullRequest
+   * @param pull {Object}
+   */
+//handlePullRequest: function(pull) {
+//  // Check if this came through a webhooks setup
+//  if (pull.action !== undefined) {
+//    if (pull.action === 'closed') {
+//      // this.publish('pull_request.closed', pull);
+//      // if (pull.pull_request.merged) {
+//      //   this.log.debug('pull was merged, skipping');
+//      //   this.publish('pull_request.merged', pull);
+//      // }
+//      // else {
+//      //   this.log.debug('pull was closed, skipping');
+//      // }
+
+//      return 'closed';
+//    }
+
+//    if (pull.action !== 'synchronize' && pull.action !== 'opened') {
+//      this.log.debug('Ignoring pull request, action not supported', { pull_number: pull.number, action: pull.action });
+//      return;
+//    }
+
+//    pull = pull.pull_request;
+//  }
+
+//  // During testing there were cases where the mergeable flag was null when using webhooks.
+//  // In that case we want to allow the build to be attempted. We only want to prevent it when
+//  // the mergeable flag is explicitly set to false.
+//  if (pull.mergeable !== undefined && pull.mergeable === false) {
+//    this.log.debug('Ignoring pull request, not in mergeable state', { pull_number: pull.number, mergeable: pull.mergeable });
+//    return;
+//  }
+
+//  if (pull.body && pull.body.indexOf('@' + this.config.user + ' ignore') !== -1) {
+//    this.log.debug('Ignoring pull request, flagged to be ignored', { pull_number: pull.number });
+//    return;
+//  }
+
+//  pull.repo = pull.base.repo.name;
+//  // if (this.config.skip_file_listing) {
+//  //   this.log.debug('skipping file listing for PR');
+//  //   pull.files = [];
+//  //   this.publish('pull_request.validated', pull);
+//  // }
+//  // else {
+//  //   this.checkFiles(pull);
+//  // }
+
+
+//  // TODO: Decide what this return object should look like
+
+//  // TODO: Possibly updated?
+//  pull.action = 'validated';
+//  return pull;
+//},
 
 //parseEvent: function(request) {
 //  var event = request.headers['x-github-event'];
@@ -88,44 +193,6 @@ module.exports = require('../../vent').extend({
 //  return data;
 //},
 
-///**
-// * Iterates over the configured list of repositories and uses
-// * the GitHub API to check each one for pull requests.
-// *
-// * @method checkRepos
-// */
-//checkRepos: function() {
-//  this.log.debug('Polling github for new and updated Pull Requests');
-//
-//  return q.allSettled(this.config.repos.map(function(repo) {
-//    // Getting PRs for each repo
-//    return q.ninvoke(this._api.pullRequests, 'getAll', {
-//      user: this.config.user,
-//      repo: repo,
-//      state: 'open'
-//    })
-//    .then(function getPR(resp) {
-//      return q.allSettled(Object.keys(resp)
-//      .map(function(i) { return resp[i]; })
-//      .filter(function(pull) {
-//        return pull.number && pull.number !== 'undefined';
-//      })
-//      .map(function getPRDetails(pull) {
-//        // Currently the GitHub API doesn't provide the same information for polling as
-//        // it does when requesting a single, specific, pull request. So we have to
-//        return q.ninvoke(this._api.pullRequests, 'get', {
-//          user: this.config.user,
-//          repo: repo,
-//          number: pull.number
-//        })
-//        .then(function(pull) {
-//          this.publish('pull_request', pull);
-//        }.bind(this));
-//      }, this));
-//    }.bind(this))
-//    .catch(this.error);
-//  }, this));
-//},
 
 ///**
 // * Decide whether this PR is considered to be updated or not
@@ -203,68 +270,6 @@ module.exports = require('../../vent').extend({
 //    })
 //    .catch(this.error);
 //  }
-//},
-
-///**
-// * Receives a pull request at the very beginning of the process, either from a webhook event or from the REST API,
-// * and checks to make sure we care about it.
-// *
-// * @method handlePullRequest
-// * @param pull {Object}
-// */
-//handlePullRequest: function(pull) {
-//  // Check if this came through a webhooks setup
-//  if (pull.action !== undefined) {
-//    if (pull.action === 'closed') {
-//      // this.publish('pull_request.closed', pull);
-//      // if (pull.pull_request.merged) {
-//      //   this.log.debug('pull was merged, skipping');
-//      //   this.publish('pull_request.merged', pull);
-//      // }
-//      // else {
-//      //   this.log.debug('pull was closed, skipping');
-//      // }
-
-//      return 'closed';
-//    }
-
-//    if (pull.action !== 'synchronize' && pull.action !== 'opened') {
-//      this.log.debug('Ignoring pull request, action not supported', { pull_number: pull.number, action: pull.action });
-//      return;
-//    }
-
-//    pull = pull.pull_request;
-//  }
-
-//  // During testing there were cases where the mergeable flag was null when using webhooks.
-//  // In that case we want to allow the build to be attempted. We only want to prevent it when
-//  // the mergeable flag is explicitly set to false.
-//  if (pull.mergeable !== undefined && pull.mergeable === false) {
-//    this.log.debug('Ignoring pull request, not in mergeable state', { pull_number: pull.number, mergeable: pull.mergeable });
-//    return;
-//  }
-
-//  if (pull.body && pull.body.indexOf('@' + this.config.user + ' ignore') !== -1) {
-//    this.log.debug('Ignoring pull request, flagged to be ignored', { pull_number: pull.number });
-//    return;
-//  }
-
-//  pull.repo = pull.base.repo.name;
-//  // if (this.config.skip_file_listing) {
-//  //   this.log.debug('skipping file listing for PR');
-//  //   pull.files = [];
-//  //   this.publish('pull_request.validated', pull);
-//  // }
-//  // else {
-//  //   this.checkFiles(pull);
-//  // }
-
-
-//  // TODO: Decide what this return object should look like
-
-//  // TODO: Possibly updated?
-//  pull.action = 'validated';
-//  return pull;
 //},
 
 //validateRetest: function(payload) {
