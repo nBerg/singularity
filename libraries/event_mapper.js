@@ -40,19 +40,22 @@ function packageMeta(meta) {
 }
 
 /**
- * Maps channel events to vent callbacks
+ * Maps channel events to adapter callbacks
  *
  * @param {Object} trigger    creates an event trigger, mapping a {channel,topic}
- *                            to a {vent,callback}
+ *                            to a {adapter,callback}
  * @return {Object} A promise
  */
 function createTrigger(trigger) {
-  app.log.get('console').debug('[trigger.add]', trigger);
+  this.debug('[trigger.add]', trigger);
   var channelObj = postal.channel(trigger.channel),
   callback = function(data, envelope) {
-    app.log.get('console').debug('[channel.topic -> vent.callback]', trigger);
-    app[trigger.vent][trigger.callback](data);
-  };
+    this.debug('[channel.topic -> adapter.callback]', trigger);
+    q.resolve(data)
+    .then(app[trigger.adapter][trigger.callback])
+    .catch(this.error)
+    .done();
+  }.bind(this);
   channelObj.subscribe(trigger.topic, callback);
 }
 
@@ -64,7 +67,7 @@ function createTrigger(trigger) {
  */
 function validateTrigger(trigger) {
   return q.fcall(function() {
-    ['channel', 'topic', 'vent', 'callback'].forEach(function(param) {
+    ['channel', 'topic', 'adapter', 'callback'].forEach(function(param) {
       if (!trigger[param]) {
         throw 'missing param "' + param + '" in ' + JSON.stringify(event);
       }
@@ -76,10 +79,12 @@ function validateTrigger(trigger) {
 /**
  * @module EventMapper
  */
-module.exports = require('nbd/Class').extend({
+module.exports = require('./vent').extend({
   init: function(option) {
     this.log = app.log.get('console');
-    this.react.bind(this);
+    this._super(option);
+    this.react = this.react.bind(this);
+    createTrigger = createTrigger.bind(this);
   },
 
   react: function(data) {
