@@ -1,5 +1,3 @@
-"use strict";
-
 var q = require('q'),
 app = require('flatiron').app,
 postal = require('postal');
@@ -84,7 +82,6 @@ module.exports = require('./vent').extend({
     this.log = app.log.get('console');
     this._super(option);
     this.react = this.react.bind(this);
-    createTrigger = createTrigger.bind(this);
   },
 
   react: function(data) {
@@ -94,7 +91,7 @@ module.exports = require('./vent').extend({
 
   addTrigger: function(trigger) {
     validateTrigger(trigger)
-    .then(createTrigger)
+    .then(createTrigger.bind(this))
     .catch(this.log.error)
     .done();
   }
