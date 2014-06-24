@@ -104,6 +104,11 @@ module.exports = require('../vent').extend({
     this.delegateTask = this.delegateTask.bind(this);
     this.start = this.start.bind(this);
     this.plugins = [];
+    // do I know what I'm doing? obviously not.
+    this.bound_fx = this.bound_fx || [];
+    this.bound_fx.forEach(function(fx) {
+      this[fx] = this[fx].bind(this);
+    }, this);
   },
 
   /**
