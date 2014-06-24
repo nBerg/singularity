@@ -50,7 +50,7 @@ function createTrigger(trigger) {
   callback = function(data, envelope) {
     this.debug('[channel.topic -> adapter.callback]', trigger);
     q.resolve(data)
-    .then(app[trigger.adapter][trigger.callback])
+    .then(app[trigger.adapter][trigger.callback].bind(app[trigger.adapter]))
     .catch(this.error)
     .done();
   }.bind(this);
@@ -92,7 +92,7 @@ module.exports = require('./vent').extend({
   addTrigger: function(trigger) {
     validateTrigger(trigger)
     .then(createTrigger.bind(this))
-    .catch(this.log.error)
+    .catch(this.error)
     .done();
   }
 });
