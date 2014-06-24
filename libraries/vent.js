@@ -1,5 +1,13 @@
 "use strict";
 
+var winston = require('winston'),
+logger = new winston.Logger({
+  transports: [
+    new (winston.transports.Console)()
+  ]
+});
+logger.cli();
+
 function formatLogArgs(args) {
   args = Array.prototype.slice.call(args);
   args[0] = (typeof args[0] === 'string') ? args[0] : args[0].toString();
@@ -12,6 +20,7 @@ function formatLogArgs(args) {
 module.exports = require('nbd/Class').extend({
   init: function(option) {
     this.config = option;
+    this.log = logger;
     this.info = this.info.bind(this);
     this.debug = this.debug.bind(this);
     this.error = this.error.bind(this);
