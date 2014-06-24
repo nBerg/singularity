@@ -19,6 +19,7 @@ module.exports.VcsPayload = require('./payload').extend({
       'change_id' // actual pull_request ID
   ],
   field_vals: {
-    status: ['open', 'closed', 'merged']
+    // null status => N/A
+    status: ['open', 'closed', 'merged', null]
   }
 });
