@@ -1,9 +1,10 @@
 var range_check = require('range_check'),
 q = require('q'),
-payload = require('../libraries/payload');
+payload = require('../libraries/payloads/http');
 
-// We only want to accept local requests and GitHub requests. See the Service Hooks
-// page of any repo you have admin access to to see the list of GitHub public IPs.
+// We only want to accept local requests and GitHub requests. See the Service
+// Hooks page of any repo you have admin access to to see the list of GitHub
+// public IPs.
 var allowed_ips = ['127.0.0.1'],
 allowed_ranges = [
     '207.97.227.253/32',

@@ -4,6 +4,12 @@ var q = require('q'),
 path = require('path'),
 fs = require('fs');
 
+/**
+ * Util fx to throw errors with a nice "tag"
+ *
+ * @param {String} name
+ * @param {*} message
+ */
 function adapterError(name, message) {
   throw '[adapter.' + name + '] ' + message;
 }
@@ -66,14 +72,14 @@ function pathFromName(plugin) {
  * @param {String} path Path of plugin to load
  */
 function loadFromPath(plugin, path) {
-  var klass = require(path);
-  this.plugins.push(new klass(this.config.get(plugin)));
+  var klass = require(path),
+  instance = new klass(this.config.get(plugin));
+  instance.log = this.log;
+  instance.setChannel(this.name);
+  this.plugins.push(instance);
 }
 
 module.exports = require('../vent').extend({
-  // full array of all plugins for this adapter
-  plugins: [],
-
   /**
    * Typically called by an external force to start internal
    * processes, such as polling
@@ -95,7 +101,14 @@ module.exports = require('../vent').extend({
     }
     option = require('nconf').defaults(option);
     this._super(option);
-    this.delegateTask.bind(this);
+    this.delegateTask = this.delegateTask.bind(this);
+    this.start = this.start.bind(this);
+    this.plugins = [];
+    // do I know what I'm doing? obviously not.
+    this.bound_fx = this.bound_fx || [];
+    this.bound_fx.forEach(function(fx) {
+      this[fx] = this[fx].bind(this);
+    }, this);
   },
 
   /**
@@ -130,7 +143,7 @@ module.exports = require('../vent').extend({
         return self.attachPlugin(plugin);
       })
     )
-    .then(self.start.bind(self))
+    .then(self.start)
     .done();
   },
 
@@ -170,15 +183,16 @@ module.exports = require('../vent').extend({
     var self = this,
     promises = this.plugins.map(function(plugin) {
       return q.resolve(plugin)
-      .then(function(plugin) {
+      .then(function(instance) {
         self.log.debug(
           '[adapter.delegateTask]',
           {
             task: fx,
-            plugin: plugin.name
+            adapter: self.name,
+            plugin: instance.name
           }
         );
-        return plugin;
+        return instance;
       })
       .post(fx, args)
       .catch(self.error);

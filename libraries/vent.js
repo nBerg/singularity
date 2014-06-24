@@ -1,32 +1,31 @@
 "use strict";
 
-var postal = require('postal');
+function formatLogArgs(args) {
+  args = Array.prototype.slice.call(args);
+  args[0] = (typeof args[0] === 'string') ? args[0] : args[0].toString();
+  return args;
+}
 
 // vent: something turns a bunch of knobs
 // ...and things just keep coming out
 // ...of all the...holes...? :|
 module.exports = require('nbd/Class').extend({
-  name: 'unnamed-vent',
-  channel: undefined,
-
-  setChannel: function(channelName) {
-    this.channel = postal.channel(channelName);
-  },
-
-  publish: function(topic, data) {
-    if (!this.channel) {
-      this.error('cannot publish topic, no channel', {topic: topic, vent: this.name});
-      return;
-    }
-    this.channel.publish(topic, data);
-  },
-
   init: function(option) {
     this.config = option;
+    this.info = this.info.bind(this);
+    this.debug = this.debug.bind(this);
     this.error = this.error.bind(this);
   },
 
+  info: function() {
+    this.log.info.apply(this.log, formatLogArgs(arguments));
+  },
+
+  debug: function() {
+    this.log.debug.apply(this.log, formatLogArgs(arguments));
+  },
+
   error: function() {
-    this.log.error.apply(this.log, Array.prototype.slice.call(arguments));
+    this.log.error.apply(this.log, formatLogArgs(arguments));
   }
 });

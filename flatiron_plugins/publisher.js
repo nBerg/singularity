@@ -12,7 +12,5 @@ module.exports = plugin = {
     this.publisher.attachConfigPlugins();
   },
 
-  init: function(done) {
-    done();
-  }
+  init: function(done) { done(); }
 };
