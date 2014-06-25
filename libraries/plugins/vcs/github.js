@@ -237,7 +237,7 @@ module.exports = require('../plugin').extend({
     .spread(this.publish.bind(this));
 
     promise.done(
-      function(payload) { return defer.resolve(); },
+      function() { return defer.resolve(payload); },
       function(reason) { return defer.reject(reason); }
     );
 
