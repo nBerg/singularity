@@ -145,14 +145,14 @@ function vcsPayload(payload, auth_user) {
   commentPayload = pullFromComment.bind(this);
 
   if (event === 'issue_comment') {
-    return ['proposal', commentPayload(payload, auth_user)]
+    return q.all(['proposal', commentPayload(payload, auth_user)]);
   }
   if (event === 'pull_request') {
     payload = validatePull(payload, auth_user);
-    return ['proposal', payloadFromPull(payload)];
+    return q.all(['proposal', payloadFromPull(payload)]);
   }
   if (event === 'push') {
-    return ['change', payloadFromPush(payload)];
+    return q.all(['change', payloadFromPush(payload)]);
   }
 
   throwError(
@@ -162,14 +162,12 @@ function vcsPayload(payload, auth_user) {
 }
 
 /**
- * MUST BIND `this` to this function! Not in object because this is not something
- * that should be exposed.
- * Generates a VCS Payload from a comment
+ * Determines if the issue_comment is valid & directed @ me
  *
  * @param {Object} comment github issue_comment payload
- * @return {Object} from payloadFromPull
+ * @throws String on validation error
  */
-function pullFromComment(comment, auth_user) {
+function validateCommentPayload(comment, auth_user) {
   if (!comment.issue.pull_request ||
       comment.issue.pull_request.html_url == null) {
     throwError('Ignoring non-pull request issue notification');
@@ -185,6 +183,20 @@ function pullFromComment(comment, auth_user) {
   if (command !== 'retest') {
     throwError("Ignoring unknown request: " + comment.comment.body);
   }
+}
+
+/**
+ * MUST BIND `this` to this function! Not in object because this is not something
+ * that should be exposed, but this needs access to an _api instance that has
+ * authenticated.
+ *
+ * Generates a VCS Payload from a comment.
+ *
+ * @param {Object} comment github issue_comment payload
+ * @return {Object} from payloadFromPull
+ */
+function pullFromComment(comment, auth_user) {
+  validateCommentPayload(comment, auth_user);
 
   this.debug(
     'Received retest request for pull',
@@ -194,16 +206,11 @@ function pullFromComment(comment, auth_user) {
     }
   );
 
-  return q.ninvoke(this._api.pullRequests, 'get', {
+  return this.getPull({
     user: comment.repository.owner.login,
     repo: comment.repository.name,
     number: comment.issue.number
-  })
-  .then(function(pull) {
-    pull.from_issue_comment = true;
-    return pull;
-  }.bind(this))
-  .catch(this.error);
+  });
 }
 
 /**
@@ -264,6 +271,32 @@ module.exports = require('../plugin').extend({
   },
 
   /**
+   * Util function to wrap API calls to get PR data
+   * also makes other functions a bit easier to test
+   */
+  getPull: function(query) {
+    var reqPromise = q.defer();
+
+    q.ninvoke(this._api.pullRequests, 'get', query)
+    .catch(this.error)
+    .done(function(pull) {
+      if (!pull) {
+        reqPromise.reject(logMsg(
+          'could not get PR for issue_comment; ' +
+          JSON.stringify(prQuery)
+        ));
+        return;
+      }
+      reqPromise.resolve(pull);
+    },
+    function(reason) {
+      reqPromise.reject(reason);
+    });
+
+    return reqPromise.promise;
+  },
+
+  /**
    * Iterates over the configured list of repositories and uses
    * the GitHub API to check each one for pull requests.
    *
@@ -288,7 +321,7 @@ module.exports = require('../plugin').extend({
         .map(function getPRDetails(pull) {
           // Currently the GitHub API doesn't provide the same information for
           // polling as it does when requesting a single, specific, pull request.
-          return q.ninvoke(this._api.pullRequests, 'get', {
+          return this.getPull({
             user: repo_owner,
             repo: repo_name,
             number: pull.number
