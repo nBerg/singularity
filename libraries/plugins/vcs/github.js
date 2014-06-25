@@ -210,7 +210,9 @@ function pullFromComment(comment, auth_user) {
     user: comment.repository.owner.login,
     repo: comment.repository.name,
     number: comment.issue.number
-  });
+  })
+  .then(payloadFromPull)
+  .catch(this.error);
 }
 
 /**
