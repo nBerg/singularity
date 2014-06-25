@@ -18,13 +18,17 @@ var pluginConfig = {
 };
 
 describe('plugins/vcs/github', function() {
-  // doing this only once because of log object singletons
-  // TODO: see if this can be avoided...
-  var instance = new Plugin(pluginConfig),
-  logDebugSpy = sinon.spy(instance.log, 'debug');
+  var instance, logDebugSpy, sinonSandbox;
 
   beforeEach(function(done) {
     instance = new Plugin(pluginConfig);
+    sinonSandbox = sinon.sandbox.create();
+    logDebugSpy = sinonSandbox.spy(instance.log, 'debug');
+    done();
+  });
+
+  afterEach(function(done) {
+    sinonSandbox.restore();
     done();
   });
 
@@ -36,8 +40,8 @@ describe('plugins/vcs/github', function() {
 
   describe('#start', function() {
     it('polls just once when method is hooks', function() {
-      var pollReposSpy = sinon.spy();
-      sinon.stub(instance, 'pollRepos', pollReposSpy);
+      var pollReposSpy = sinonSandbox.spy();
+      sinonSandbox.stub(instance, 'pollRepos', pollReposSpy);
       instance.start();
       expect(logDebugSpy).to.be.calledOnce;
       expect(pollReposSpy).to.be.calledOnce;
@@ -45,12 +49,11 @@ describe('plugins/vcs/github', function() {
   });
 
   describe('#processPayload', function() {
-    var testPr, publishSpy;
+    var testPr, testPush, testComment, publishSpy;
 
     beforeEach(function(done) {
-      testPr = require('./test_pr');
-      testPr.mergeable = true;
-      publishSpy = sinon.spy(instance, 'publish');
+      testPr = require('./test_pr')();
+      publishSpy = sinonSandbox.spy(instance, 'publish');
       done();
     });
 
@@ -74,63 +77,86 @@ describe('plugins/vcs/github', function() {
       .rejectedWith(/unrecognized event/);
     });
 
-    it('publishes plain pull_request payloads', function() {
-      testPr.__headers = {'x-github-event': 'pull_request'};
-      return expect(instance.processPayload(testPr))
-      .to.be.fulfilled
-      .then(function() {
-        expect(publishSpy).to.be.calledWith('proposal');
+    describe('=> pull_request', function() {
+      it('publishes plain pull_request payloads', function() {
+        return expect(instance.processPayload(testPr))
+        .to.be.fulfilled
+        .then(function() {
+          expect(publishSpy).to.be.calledWith('proposal');
+        });
+      });
+
+      it('accepts hook PR payloads for synchronize actions', function() {
+        testPr = {
+          __headers: { 'x-github-event': 'pull_request' },
+          pull_request: testPr,
+          action: 'synchronize'
+        };
+        return expect(instance.processPayload(testPr))
+        .to.be.fulfilled
+        .then(function() {
+          return expect(publishSpy).to.be.calledWith('proposal');
+        });
+      });
+
+      it('accepts hook PR payloads for opened actions', function() {
+        testPr = {
+          __headers: { 'x-github-event': 'pull_request' },
+          pull_request: testPr,
+          action: 'opened'
+        };
+        return expect(instance.processPayload(testPr))
+        .to.be.fulfilled
+        .then(function() {
+          return expect(publishSpy).to.be.calledWith('proposal');
+        });
+      });
+
+      it('rejects hook PR payloads for unrecognized actions', function() {
+        testPr = {
+          __headers: { 'x-github-event': 'pull_request' },
+          pull_request: testPr,
+          action: 'bad_event'
+        };
+        return expect(instance.processPayload(testPr))
+        .to.eventually.be.rejectedWith(/ignoring pull action/);
+      });
+
+      it('rejects PR payloads that cannot be merged', function() {
+        testPr.mergeable = false;
+        return expect(instance.processPayload(testPr))
+        .to.eventually.be.rejectedWith(/PR cannot be merged, ignoring/);
+      });
+
+      it('rejects PR payloads where the user specifies us to ignore', function() {
+        testPr.body = '@' + pluginConfig.auth.username + ' ignore';
+        return expect(instance.processPayload(testPr))
+        .to.eventually.be.rejectedWith(/user requested for PR to be ignored - /);
       });
     });
 
-    it('accepts hook PR payloads for synchronize actions', function() {
-      testPr = {
-        pull_request: testPr,
-        action: 'synchronize'
-      };
-      testPr.__headers = {'x-github-event': 'pull_request'};
-      return expect(instance.processPayload(testPr))
-      .to.be.fulfilled
-      .then(function() {
-        return expect(publishSpy).to.be.calledWith('proposal');
+    describe('=> issue_comment', function() {
+      it('can process issue_comment payloads', function() {
+        testComment = require('./test_comment')();
+        testComment.comment.body = '@' + pluginConfig.auth.username + ' retest';
+        return expect(instance.processPayload(testComment))
+        .to.be.fulfilled
+        .then(function() {
+          return expect(publishSpy).to.be.calledWith('proposal');
+        });
       });
     });
 
-    it('accepts hook PR payloads for opened actions', function() {
-      testPr = {
-        pull_request: testPr,
-        action: 'opened'
-      };
-      testPr.__headers = {'x-github-event': 'pull_request'};
-      return expect(instance.processPayload(testPr))
-      .to.be.fulfilled
-      .then(function() {
-        return expect(publishSpy).to.be.calledWith('proposal');
+    describe('=> push', function() {
+      it('can process push payloads', function() {
+        testPush = require('./test_push')();
+        return expect(instance.processPayload(testPush))
+        .to.be.fulfilled
+        .then(function() {
+          return expect(publishSpy).to.be.calledWith('change');
+        });
       });
     });
 
-    it('rejects hook PR payloads for unrecognized actions', function() {
-      testPr = {
-        pull_request: testPr,
-        action: 'bad_event'
-      };
-      testPr.__headers = {'x-github-event': 'pull_request'};
-      return expect(instance.processPayload(testPr))
-      .to.eventually.be.rejectedWith(/ignoring pull action/);
-    });
-
-    it('rejects PR payloads that cannot be merged', function() {
-      testPr.mergeable = false;
-      testPr.__headers = {'x-github-event': 'pull_request'};
-      return expect(instance.processPayload(testPr))
-      .to.eventually.be.rejectedWith(/PR cannot be merged, ignoring/);
-    });
-
-    it('rejects PR payloads where the user specifies us to ignore', function() {
-      testPr.body = '@' + pluginConfig.auth.username + ' ignore';
-      testPr.__headers = {'x-github-event': 'pull_request'};
-      return expect(instance.processPayload(testPr))
-      .to.eventually.be.rejectedWith(/user requested for PR to be ignored - /);
-    });
   });
 });

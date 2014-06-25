@@ -145,7 +145,7 @@ function vcsPayload(payload, auth_user) {
   commentPayload = pullFromComment.bind(this);
 
   if (event === 'issue_comment') {
-    return ['proposal', commentPayload(payload)]
+    return ['proposal', commentPayload(payload, auth_user)]
   }
   if (event === 'pull_request') {
     payload = validatePull(payload, auth_user);
@@ -294,7 +294,7 @@ module.exports = require('../plugin').extend({
             number: pull.number
           })
           .then(function(pull) {
-            this.publish('pull_request', payloadFromPull(pull));
+            this.publish('proposal', payloadFromPull(pull));
           }.bind(this));
         }, this));
       }.bind(this))
