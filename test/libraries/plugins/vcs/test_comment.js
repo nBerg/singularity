@@ -8,13 +8,14 @@ module.exports = function() {
       name: 'comment_repo',
       url: 'https://github.com/comment_repo_owner/comment_repo',
       owner: {
-        name: 'comment_repo_owner'
+        login: 'comment_repo_owner'
       }
     },
     comment: {
       body: 'replace this field for tests'
     },
     issue: {
+      number: 16,
       pull_request: {
         html_url: 'https://github.com/comment_owner/comment_repo'
       }
