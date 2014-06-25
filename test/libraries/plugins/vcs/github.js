@@ -1,4 +1,5 @@
 var Plugin = require('../../../../libraries/plugins/vcs/github'),
+q = require('q'),
 chai = require('chai'),
 expect = chai.expect,
 sinon = require('sinon');
@@ -49,7 +50,7 @@ describe('plugins/vcs/github', function() {
   });
 
   describe('#processPayload', function() {
-    var testPr, testPush, testComment, publishSpy;
+    var testPr, testPush, testComment, publishSpy, apiStub;
 
     beforeEach(function(done) {
       testPr = require('./test_pr')();
@@ -57,24 +58,26 @@ describe('plugins/vcs/github', function() {
       done();
     });
 
-    it('throws error when no headers given', function() {
-      return expect(instance.processPayload({}))
-        .to.eventually.be
-        .rejectedWith('invalid payload - no __headers field');
-    });
+    describe('=> invalid_payload', function() {
+      it('throws error when no headers given', function() {
+        return expect(instance.processPayload({}))
+          .to.eventually.be
+          .rejectedWith('invalid payload - no __headers field');
+      });
 
-    it('throws error when no x-github-event header', function() {
-      return expect(instance.processPayload({ __headers: {} }))
-        .to.eventually.be
-        .rejectedWith('not a github event, ignoring');
-    });
+      it('throws error when no x-github-event header', function() {
+        return expect(instance.processPayload({ __headers: {} }))
+          .to.eventually.be
+          .rejectedWith('not a github event, ignoring');
+      });
 
-    it('throws error when unrecognized event sent', function() {
-      return expect(instance.processPayload({
-        __headers: {'x-github-event': 'foo'}
-      }))
-      .to.be
-      .rejectedWith(/unrecognized event/);
+      it('throws error when unrecognized event sent', function() {
+        return expect(instance.processPayload({
+          __headers: {'x-github-event': 'foo'}
+        }))
+        .to.be
+        .rejectedWith(/unrecognized event/);
+      });
     });
 
     describe('=> pull_request', function() {
@@ -136,7 +139,32 @@ describe('plugins/vcs/github', function() {
     });
 
     describe('=> issue_comment', function() {
+      it('rejects non-PR issue comments', function() {
+        testComment = {
+          __headers: {'x-github-event': 'issue_comment'},
+          issue: {}
+        };
+        return expect(instance.processPayload(testComment))
+        .to.be.rejectedWith('Ignoring non-pull request issue notification');
+      });
+
+      it('ignores comments not directed @ CI user', function() {
+        testComment = require('./test_comment')();
+        testComment.comment.body = '@chr0n1x retest';
+        return expect(instance.processPayload(testComment))
+        .to.be.rejectedWith(/Not addressed @ me/);
+      });
+
+      it('ignores unknown commands', function() {
+        testComment = require('./test_comment')();
+        testComment.comment.body = '@' + pluginConfig.auth.username + ' ohai';
+        return expect(instance.processPayload(testComment))
+        .to.be.rejectedWith(/Ignoring unknown request: /);
+      });
+
       it('can process issue_comment payloads', function() {
+        apiStub = sinonSandbox.stub(instance, 'getPull');
+        apiStub.returns(q.resolve(require('./test_pr')()));
         testComment = require('./test_comment')();
         testComment.comment.body = '@' + pluginConfig.auth.username + ' retest';
         return expect(instance.processPayload(testComment))
@@ -157,6 +185,5 @@ describe('plugins/vcs/github', function() {
         });
       });
     });
-
   });
 });
