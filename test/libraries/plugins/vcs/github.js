@@ -7,6 +7,7 @@ sinon = require('sinon');
 chai.use(require('sinon-chai'));
 chai.use(require('chai-as-promised'));
 var pluginConfig = {
+  method: 'hooks',
   host: 'foo',
   port: 'bar',
   auth: {
@@ -17,7 +18,10 @@ var pluginConfig = {
 };
 
 describe('plugins/vcs/github', function() {
-  var instance;
+  // doing this only once because of log object singletons
+  // TODO: see if this can be avoided...
+  var instance = new Plugin(pluginConfig),
+  logDebugSpy = sinon.spy(instance.log, 'debug');
 
   beforeEach(function(done) {
     instance = new Plugin(pluginConfig);
@@ -30,11 +34,22 @@ describe('plugins/vcs/github', function() {
     });
   });
 
+  describe('#start', function() {
+    it('polls just once when method is hooks', function() {
+      var pollReposSpy = sinon.spy();
+      sinon.stub(instance, 'pollRepos', pollReposSpy);
+      instance.start();
+      expect(logDebugSpy).to.be.calledOnce;
+      expect(pollReposSpy).to.be.calledOnce;
+    });
+  });
+
   describe('#processPayload', function() {
     var testPr, publishSpy;
 
     beforeEach(function(done) {
       testPr = require('./test_pr');
+      testPr.mergeable = true;
       publishSpy = sinon.spy(instance, 'publish');
       done();
     });
@@ -102,6 +117,20 @@ describe('plugins/vcs/github', function() {
       testPr.__headers = {'x-github-event': 'pull_request'};
       return expect(instance.processPayload(testPr))
       .to.eventually.be.rejectedWith(/ignoring pull action/);
+    });
+
+    it('rejects PR payloads that cannot be merged', function() {
+      testPr.mergeable = false;
+      testPr.__headers = {'x-github-event': 'pull_request'};
+      return expect(instance.processPayload(testPr))
+      .to.eventually.be.rejectedWith(/PR cannot be merged, ignoring/);
+    });
+
+    it('rejects PR payloads where the user specifies us to ignore', function() {
+      testPr.body = '@' + pluginConfig.auth.username + ' ignore';
+      testPr.__headers = {'x-github-event': 'pull_request'};
+      return expect(instance.processPayload(testPr))
+      .to.eventually.be.rejectedWith(/user requested for PR to be ignored - /);
     });
   });
 });
