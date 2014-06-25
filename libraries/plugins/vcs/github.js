@@ -1,16 +1,214 @@
 var GitHubApi = require('github'),
 async = require('async'),
 q = require('q'),
-allowed_events = ['issue_comment', 'pull_request', 'push'];
+allowed_events = ['issue_comment', 'pull_request', 'push'],
+allowed_pr_actions = ['synchronize', 'opened'],
+VcsPayload = require('../../payloads/vcs').VcsPayload;
 
-function logMsg(message) {
-  return '[vcs.github] ' + message;
+// wrapper functions for logging messages, cause...I haven't even started
+// thinking of a way to standardize logging...
+function logMsg(message) { return '[vcs.github] ' + message; }
+function throwError(message) { throw logMsg(message); }
+
+/**
+ * Validates that a given payload is ok to parse / use, returns it
+ *
+ * @param {Object} payload Raw github event with a __headers array appended from
+ *                         the HTTP Payload object
+ * @return {Object} the same payload
+ */
+function validateGithubPayload(payload) {
+  if (!payload.__headers) {
+    throwError('invalid payload - no __headers field');
+  }
+  if (!payload.__headers['x-github-event']) {
+    throwError('not a github event, ignoring');
+  }
+  if (!~allowed_events.indexOf(payload.__headers['x-github-event'])) {
+    throwError(
+      'unrecognized event "' +
+      payload.__headers['x-github-event'] +
+      '"'
+    );
+  }
+  return payload;
 }
 
-function throwError(message) {
-  throw logMsg(message);
+/**
+ * Generates a VCS Payload from a push
+ *
+ * @param {Object} push github push payload
+ * @return {Object} VCS Payload
+ */
+function payloadFromPush(push) {
+  var payload = {
+    repo: push.repository.owner.name + '/' + push.repository.name,
+    before: push.before,
+    after: push.after,
+    actor: push.pusher.name,
+
+    repo_url: push.repository.url,
+    base_ref: push.ref,
+    fork_url: null,
+    fork_ref: null,
+
+    status: null,
+    repo_id: push.repository.id,
+    change: push.compare.split('/').pop(),
+    change_id: push.after
+  };
+
+  (new VcsPayload(payload)).validate();
+
+  return payload;
 }
 
+/**
+ * Given a PR, returns a string that represents its state that is recognized by
+ * the rest of the system (via the VCS payload)
+ *
+ * @param {Object} pull Raw github event
+ * @return {String} state
+ */
+function statusOfPull(pull) {
+  // During testing there were cases where the mergeable flag was null when using
+  // webhooks. We only want to return 'merged' when explicitly set to true
+  if (pull.merged) {
+    return 'merged';
+  }
+  return pull.state;
+}
+
+/**
+ * Checks & validates pull object, whether it should be ignored
+ */
+function validatePull(pull, auth_user) {
+  var pr_name;
+  // decide whether this came from a webhook or an API call made internally
+  if (pull.pull_request) {
+    pr_name = pull.pull_request.base.repo.full_name +
+              ' #' + pull.pull_request.number;
+    if (!~allowed_pr_actions.indexOf(pull.action)) {
+      throwError('ignoring pull action [' + pull.action + '] for ' + pr_name);
+    }
+    pull = pull.pull_request;
+  }
+
+  var pr_name = pull.base.repo.full_name + ' #' + pull.number;
+
+  if (pull.mergeable === false) {
+    throwError('PR cannot be merged, ignoring ' + pr_name);
+  }
+  if (pull.body && ~pull.body.indexOf('@' + auth_user + ' ignore')) {
+    throwError('user requested for PR to be ignored - ' + pr_name);
+  }
+  return pull;
+}
+
+/**
+ * Generates a VCS Payload from a RAW pull_request (not a webhook payload)
+ * ie: webhook_payload.pull_request, not webhook_payload
+ *
+ * @return {Object} VCS Payload
+ */
+function payloadFromPull(pull) {
+  var payload = {
+    repo: pull.base.repo.full_name,
+    before: pull.base.sha,
+    after: pull.head.sha,
+    actor: pull.user.login,
+
+    repo_url: pull.base.repo.ssh_url,
+    base_ref: pull.base.ref,
+    fork_url: pull.head.repo.ssh_url,
+    fork_ref: pull.head.ref,
+
+    status: statusOfPull(pull),
+    repo_id: pull.base.repo.id,
+    change: pull.number,
+    change_id: pull.id
+  };
+
+  (new VcsPayload(payload)).validate();
+
+  return payload;
+}
+
+/**
+ * MUST BIND `this` to this function!
+ *
+ * @param {Object} payload HTTP hook payload generated from github webhook
+ * @return {Object} An object depending on the x-github-event value
+ */
+function vcsPayload(payload, auth_user) {
+  var event = payload.__headers['x-github-event'],
+  commentPayload = pullFromComment.bind(this);
+
+  if (event === 'issue_comment') {
+    return ['proposal', commentPayload(payload)]
+  }
+  if (event === 'pull_request') {
+    payload = validatePull(payload, auth_user);
+    return ['proposal', payloadFromPull(payload)];
+  }
+  if (event === 'push') {
+    return ['change', payloadFromPush(payload)];
+  }
+
+  throwError(
+    'invalid payload given ' +
+    JSON.stringify(payload).substring(0, 64) + '...'
+  );
+}
+
+/**
+ * MUST BIND `this` to this function! Not in object because this is not something
+ * that should be exposed.
+ * Generates a VCS Payload from a comment
+ *
+ * @param {Object} comment github issue_comment payload
+ * @return {Object} from payloadFromPull
+ */
+function pullFromComment(comment, auth_user) {
+  if (!comment.issue.pull_request ||
+      comment.issue.pull_request.html_url == null) {
+    throwError('Ignoring non-pull request issue notification');
+  }
+
+  var commentArray = comment.comment.body.split(' '),
+      addressedIndex = commentArray.indexOf('@' + auth_user),
+      command = commentArray[addressedIndex + 1];
+
+  if (!~addressedIndex) {
+    throwError('Not addressed @ me');
+  }
+  if (command !== 'retest') {
+    throwError("Ignoring unknown request: " + comment.comment.body);
+  }
+
+  this.debug(
+    'Received retest request for pull',
+    {
+      pull_number: comment.issue.number,
+      repo: comment.repository.name
+    }
+  );
+
+  return q.ninvoke(this._api.pullRequests, 'get', {
+    user: comment.repository.owner.login,
+    repo: comment.repository.name,
+    number: comment.issue.number
+  })
+  .then(function(pull) {
+    pull.from_issue_comment = true;
+    return pull;
+  }.bind(this))
+  .catch(this.error);
+}
+
+/**
+ * Github VCS plugin
+ */
 module.exports = require('../plugin').extend({
   name: 'github',
 
@@ -29,20 +227,21 @@ module.exports = require('../plugin').extend({
   },
 
   processPayload: function(payload) {
-    if (!payload.__headers) {
-      throwError('invalid payload - no __headers field');
-    }
-    if (!payload.__headers['x-github-event']) {
-      throwError('not a github event, ignoring');
-    }
-    if (!~allowed_events.indexOf(payload.__headers['x-github-event'])) {
-      throwError(
-        'unrecognized event "' +
-        payload.__headers['x-github-event'] +
-        '"'
-      );
-    }
-    this.publish('pull_request', payload);
+    var defer = q.defer(),
+    promise = q.resolve(payload)
+    .then(validateGithubPayload)
+    .then(function(pl) {
+      return [pl, this.config.auth.username];
+    }.bind(this))
+    .spread(vcsPayload.bind(this))
+    .spread(this.publish.bind(this));
+
+    promise.done(
+      function(payload) { return defer.resolve(); },
+      function(reason) { return defer.reject(reason); }
+    );
+
+    return defer.promise;
   },
 
   start: function() {
@@ -95,250 +294,11 @@ module.exports = require('../plugin').extend({
             number: pull.number
           })
           .then(function(pull) {
-            this.publish('pull_request', pull);
+            this.publish('pull_request', payloadFromPull(pull));
           }.bind(this));
         }, this));
       }.bind(this))
       .catch(this.error);
     }, this));
-  },
-
-  /**
-   * Receives a pull request at the very beginning of the process, either from a webhook event or from the REST API,
-   * and checks to make sure we care about it.
-   *
-   * @method handlePullRequest
-   * @param pull {Object}
-   */
-//handlePullRequest: function(pull) {
-//  // Check if this came through a webhooks setup
-//  if (pull.action !== undefined) {
-//    if (pull.action === 'closed') {
-//      // this.publish('pull_request.closed', pull);
-//      // if (pull.pull_request.merged) {
-//      //   this.log.debug('pull was merged, skipping');
-//      //   this.publish('pull_request.merged', pull);
-//      // }
-//      // else {
-//      //   this.log.debug('pull was closed, skipping');
-//      // }
-
-//      return 'closed';
-//    }
-
-//    if (pull.action !== 'synchronize' && pull.action !== 'opened') {
-//      this.log.debug('Ignoring pull request, action not supported', { pull_number: pull.number, action: pull.action });
-//      return;
-//    }
-
-//    pull = pull.pull_request;
-//  }
-
-//  // During testing there were cases where the mergeable flag was null when using webhooks.
-//  // In that case we want to allow the build to be attempted. We only want to prevent it when
-//  // the mergeable flag is explicitly set to false.
-//  if (pull.mergeable !== undefined && pull.mergeable === false) {
-//    this.log.debug('Ignoring pull request, not in mergeable state', { pull_number: pull.number, mergeable: pull.mergeable });
-//    return;
-//  }
-
-//  if (pull.body && pull.body.indexOf('@' + this.config.user + ' ignore') !== -1) {
-//    this.log.debug('Ignoring pull request, flagged to be ignored', { pull_number: pull.number });
-//    return;
-//  }
-
-//  pull.repo = pull.base.repo.name;
-//  // if (this.config.skip_file_listing) {
-//  //   this.log.debug('skipping file listing for PR');
-//  //   pull.files = [];
-//  //   this.publish('pull_request.validated', pull);
-//  // }
-//  // else {
-//  //   this.checkFiles(pull);
-//  // }
-
-
-//  // TODO: Decide what this return object should look like
-
-//  // TODO: Possibly updated?
-//  pull.action = 'validated';
-//  return pull;
-//},
-
-//parseEvent: function(request) {
-//  var event = request.headers['x-github-event'];
-
-//  if (event === 'issue_comment') {
-//    return 'retest';
-//  }
-
-//  return event;
-//},
-
-//handleRequest: function(request) {
-//  var data;
-
-//  try {
-//    data = JSON.parse(JSON.stringify(request.body));
-//  }
-//  catch(err) {
-//    throw {
-//      status: 422,
-//      body: {
-//        message: 'Invalid payload sent. Make sure content type == "application/json"'
-//      }
-//    };
-//  }
-
-//  return data;
-//},
-
-
-///**
-// * Decide whether this PR is considered to be updated or not
-// *
-// * @method processPullRequest
-// * @param pull {Object}
-// */
-//processPullRequest: function(pull) {
-//  if (!pull.head || !pull.head.repo) {
-//    this.log.error('Skipping pull request, invalid payload given', { number: pull.number, repo: pull.repo });
-//    return;
-//  }
-
-//  // pull.issue_comment: internally modified
-//  // a "@user retest" comment was found
-//  if (pull.head.sha !== pull.head.sha || pull.issue_comment) {
-//    this.publish('pull_request.updated', pull);
-//    return;
-//  }
-//},
-
-///**
-// * Uses the GitHub API to create a Merge Status for a pull request.
-// *
-// * @method createStatus
-// * @param sha {String}
-// * @param user {String}
-// * @param repo {String}
-// * @param state {String}
-// * @param build_url {String}
-// * @param description {String}
-// */
-//createStatus: function(sha, user, repo, state, build_url, description) {
-//  this.log.info('creating status ' + state + ' for sha ' + sha + ' for build_url ' + build_url);
-//  return q.ninvoke(this._api.statuses, 'create', {
-//    user: user,
-//    repo: repo,
-//    sha: sha,
-//    state: state,
-//    target_url: build_url,
-//    description: description
-//  })
-//  .catch(this.error);
-//},
-
-///**
-// * Uses the GitHub API to create an inline comment on the diff of a pull request.
-// *
-// * @method createComment
-// * @param pull {Object}
-// * @param sha {String}
-// * @param file {String}
-// * @param position {String}
-// * @param comment {String}
-// */
-//createComment: function(pull, sha, file, position, comment) {
-//  if (!file && !position && !comment) {
-//    return q.ninvoke(this._api.issues, 'createComment', {
-//      user: this.config.user,
-//      repo: pull.repo,
-//      number: pull.number,
-//      body: sha
-//    })
-//    .catch(this.error);
-//  }
-//  else {
-//    return q.ninvoke(this._api.pullRequests, 'createComment', {
-//      user: this.config.user,
-//      repo: pull.repo,
-//      number: pull.number,
-//      body: comment,
-//      commit_id: sha,
-//      path: file,
-//      position: position
-//    })
-//    .catch(this.error);
-//  }
-//},
-
-//validateRetest: function(payload) {
-//  //just assume all retests issue comments for now
-//  var validated = this.handleIssueComment(payload);
-//  return validated;
-//},
-
-///**
-// * Receives an issue comment from a webhook event and checks to see if we need to worry about it. If so the
-// * associated pull request will be loaded via the REST API and sent on its way for processing.
-// *
-// * @method handleIssueComment
-// * @param comment {Object}
-// */
-//handleIssueComment: function(comment) {
-//  // This event will pick up comments on issues and pull requests but we only care about pull requests
-//  if (comment.issue.pull_request.html_url == null) {
-//    this.log.debug('Ignoring non-pull request issue notification');
-//    return false;
-//  }
-
-//  var commentArray = comment.comment.body.split(' '),
-//      addressedIndex = commentArray.indexOf('@' + this.config.auth.username),
-//      command = commentArray[addressedIndex + 1];
-
-//  if (!~addressedIndex) {
-//    this.log.debug("Ignoring comment not addressed to me");
-//    return false;
-//  }
-
-//  if (command !== 'retest') {
-//    this.log.debug("Ignoring uknown request: " + comment.comment.body);
-//    return false;
-//  }
-
-//  this.log.debug('Received retest request for pull', { pull_number: comment.issue.number, repo: comment.repository.name });
-
-//  return q.ninvoke(this._api.pullRequests, 'get', {
-//    user: this.config.user,
-//    repo: comment.repository.name,
-//    number: comment.issue.number
-//  })
-//  .then(function(pull) {
-//    pull.issue_comment = true;
-//    return true;
-//  }.bind(this))
-//  .catch(this.error);
-//},
-
-///**
-// * Processes & validates push events
-// *
-// * @method handlePush
-// * @param payload {Object}
-// */
-//validatePush: function(push) {
-//  if (!push.repository ||
-//      !push.repository.name ||
-//      !push.ref ||
-//      !push.before ||
-//      !push.after ||
-//      !push.pusher ||
-//      !push.pusher.name ||
-//      !push.pusher.email) {
-//    this.error('Invalid push payload event', push);
-//    return false;
-//  }
-
-//  return true;
-//},
+  }
 });
