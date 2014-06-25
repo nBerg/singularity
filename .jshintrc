@@ -26,6 +26,7 @@
     "beforeEach": false,
     "afterEach": false,
     "describe": false,
+    "promiseFor": false,
     "it": false
   },
 
