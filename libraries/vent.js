@@ -20,7 +20,7 @@ function formatLogArgs(args) {
 module.exports = require('nbd/Class').extend({
   init: function(option) {
     this.config = option;
-    this.log = logger;
+    this.log = this.log || logger;
     this.info = this.info.bind(this);
     this.debug = this.debug.bind(this);
     this.error = this.error.bind(this);
