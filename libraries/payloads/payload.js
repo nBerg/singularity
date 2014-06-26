@@ -57,7 +57,7 @@ module.exports = require('nbd/Class').extend({
 
   validate: function() {
     this.required_fields.forEach(function(field) {
-      if (!this.data[field]) {
+      if (!this.data.hasOwnProperty(field)) {
         validationError('missing field ' + field);
       }
       if (this.field_vals[field]) {

@@ -26,6 +26,8 @@
     "beforeEach": false,
     "afterEach": false,
     "describe": false,
+    "before": false,
+    "after": false,
     "it": false
   },
 

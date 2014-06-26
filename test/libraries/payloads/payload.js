@@ -2,7 +2,7 @@ var Payload = require('../../../libraries/payloads/payload'),
 expect = require('chai').expect,
 
 TestPayload = Payload.extend({
-  required_fields: ['required'],
+  required_fields: ['required', 'required_but_empty'],
   field_vals: {
     required: ['foo']
   }
@@ -86,7 +86,7 @@ describe('Payload', function() {
     });
   });
 
-  describe('#validateData', function() {
+  describe('#validate', function() {
     it('throws when a field is missing', function() {
       instance = new TestPayload();
       expect(function() { instance.validate(); })
@@ -97,6 +97,15 @@ describe('Payload', function() {
       instance = new TestPayload({required: 'bar'});
       expect(function() { instance.validate(); })
         .to.throw(/value for.*not in.*/);
+    });
+
+    it('allows empty fields', function() {
+      instance = new TestPayload({
+        required: 'foo',
+        required_but_empty: null
+      });
+      expect(function() { instance.validate(); })
+        .to.not.throw(/missing field/);
     });
 
     it('returns "this"', function() {
