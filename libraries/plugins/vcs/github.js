@@ -8,7 +8,6 @@ VcsPayload = require('../../payloads/vcs').VcsPayload;
 // wrapper functions for logging messages, cause...I haven't even started
 // thinking of a way to standardize logging...
 function logMsg(message) { return '[vcs.github] ' + message; }
-function throwError(message) { throw logMsg(message); }
 
 /**
  * Validates that a given payload is ok to parse / use, returns it
@@ -19,17 +18,15 @@ function throwError(message) { throw logMsg(message); }
  */
 function validateGithubPayload(payload) {
   if (!payload.__headers) {
-    throwError('invalid payload - no __headers field');
+    throw 'invalid payload - no __headers field';
   }
   if (!payload.__headers['x-github-event']) {
-    throwError('not a github event, ignoring');
+    throw 'not a github event, ignoring';
   }
   if (!~allowed_events.indexOf(payload.__headers['x-github-event'])) {
-    throwError(
-      'unrecognized event "' +
+    throw 'unrecognized event "' +
       payload.__headers['x-github-event'] +
-      '"'
-    );
+      '"';
   }
   return payload;
 }
@@ -89,7 +86,7 @@ function validatePull(pull, auth_user) {
     pr_name = pull.pull_request.base.repo.full_name +
               ' #' + pull.pull_request.number;
     if (!~allowed_pr_actions.indexOf(pull.action)) {
-      throwError('ignoring pull action [' + pull.action + '] for ' + pr_name);
+      throw 'ignoring pull action [' + pull.action + '] for ' + pr_name;
     }
     pull = pull.pull_request;
   }
@@ -97,10 +94,10 @@ function validatePull(pull, auth_user) {
   var pr_name = pull.base.repo.full_name + ' #' + pull.number;
 
   if (pull.mergeable === false) {
-    throwError('PR cannot be merged, ignoring ' + pr_name);
+    throw 'PR cannot be merged, ignoring ' + pr_name;
   }
   if (pull.body && ~pull.body.indexOf('@' + auth_user + ' ignore')) {
-    throwError('user requested for PR to be ignored - ' + pr_name);
+    throw 'user requested for PR to be ignored - ' + pr_name;
   }
   return pull;
 }
@@ -155,10 +152,8 @@ function vcsPayload(payload, auth_user) {
     return q.all(['change', payloadFromPush(payload)]);
   }
 
-  throwError(
-    'invalid payload given ' +
-    JSON.stringify(payload).substring(0, 64) + '...'
-  );
+  throw 'invalid payload given ' +
+    JSON.stringify(payload).substring(0, 64) + '...';
 }
 
 /**
@@ -170,7 +165,7 @@ function vcsPayload(payload, auth_user) {
 function validateCommentPayload(comment, auth_user) {
   if (!comment.issue.pull_request ||
       comment.issue.pull_request.html_url == null) {
-    throwError('Ignoring non-pull request issue notification');
+    throw 'Ignoring non-pull request issue notification';
   }
 
   var commentArray = comment.comment.body.split(' '),
@@ -178,10 +173,10 @@ function validateCommentPayload(comment, auth_user) {
       command = commentArray[addressedIndex + 1];
 
   if (!~addressedIndex) {
-    throwError('Not addressed @ me');
+    throw 'Not addressed @ me';
   }
   if (command !== 'retest') {
-    throwError("Ignoring unknown request: " + comment.comment.body);
+    throw "Ignoring unknown request: " + comment.comment.body;
   }
 }
 
@@ -255,7 +250,7 @@ module.exports = require('../plugin').extend({
 
   start: function() {
     if (this.config.method === 'hooks') {
-      this.debug(logMsg('using hooks, performing startup PR scan.'));
+      this.debug('using hooks, performing startup PR scan.');
       this.pollRepos();
       return;
     }
