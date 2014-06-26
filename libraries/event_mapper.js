@@ -78,6 +78,9 @@ function validateTrigger(trigger) {
  * @module EventMapper
  */
 module.exports = require('./vent').extend({
+  objectType: 'core_object',
+  name: 'event_mapper',
+
   init: function(option) {
     this.log = app.log.get('console');
     this._super(option);
