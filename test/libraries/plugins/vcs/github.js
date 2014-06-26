@@ -49,7 +49,32 @@ describe('plugins/vcs/github', function() {
     });
   });
 
-  describe('#processPayload', function() {
+  describe('#validatePayload', function() {
+    it('throws error when no headers given', function() {
+      expect(function() {
+        instance.validatePayload({});
+      })
+      .to.throw('invalid payload - no __headers field');
+    });
+
+    it('throws error when no x-github-event header', function() {
+      expect(function() {
+        instance.validatePayload({ __headers: {} });
+      })
+      .to.throw('not a github event, ignoring');
+    });
+
+    it('throws error when unrecognized event sent', function() {
+      expect(function() {
+        instance.validatePayload({
+          __headers: {'x-github-event': 'foo'}
+        });
+      })
+      .to.throw(/unrecognized event/);
+    });
+  });
+
+  describe('#generateVcsPayload', function() {
     var testPr, testPush, testComment, publishSpy, apiStub;
 
     beforeEach(function(done) {
@@ -58,35 +83,10 @@ describe('plugins/vcs/github', function() {
       done();
     });
 
-    describe('=> invalid_payload', function() {
-      it('throws error when no headers given', function() {
-        return expect(instance.processPayload({}))
-          .to.eventually.be
-          .rejectedWith('invalid payload - no __headers field');
-      });
-
-      it('throws error when no x-github-event header', function() {
-        return expect(instance.processPayload({ __headers: {} }))
-          .to.eventually.be
-          .rejectedWith('not a github event, ignoring');
-      });
-
-      it('throws error when unrecognized event sent', function() {
-        return expect(instance.processPayload({
-          __headers: {'x-github-event': 'foo'}
-        }))
-        .to.be
-        .rejectedWith(/unrecognized event/);
-      });
-    });
-
     describe('=> pull_request', function() {
       it('publishes plain pull_request payloads', function() {
-        return expect(instance.processPayload(testPr))
-        .to.be.fulfilled
-        .then(function() {
-          expect(publishSpy).to.be.calledWith('proposal');
-        });
+        expect(instance.generateVcsPayload(testPr))
+          .to.deep.equal(require('./test_proposal')());
       });
 
       it('accepts hook PR payloads for synchronize actions', function() {
@@ -95,11 +95,8 @@ describe('plugins/vcs/github', function() {
           pull_request: testPr,
           action: 'synchronize'
         };
-        return expect(instance.processPayload(testPr))
-        .to.be.fulfilled
-        .then(function() {
-          return expect(publishSpy).to.be.calledWith('proposal');
-        });
+        expect(instance.generateVcsPayload(testPr))
+          .to.deep.equal(require('./test_proposal')());
       });
 
       it('accepts hook PR payloads for opened actions', function() {
@@ -108,11 +105,8 @@ describe('plugins/vcs/github', function() {
           pull_request: testPr,
           action: 'opened'
         };
-        return expect(instance.processPayload(testPr))
-        .to.be.fulfilled
-        .then(function() {
-          return expect(publishSpy).to.be.calledWith('proposal');
-        });
+        expect(instance.generateVcsPayload(testPr))
+          .to.deep.equal(require('./test_proposal')());
       });
 
       it('rejects hook PR payloads for unrecognized actions', function() {
@@ -121,20 +115,20 @@ describe('plugins/vcs/github', function() {
           pull_request: testPr,
           action: 'bad_event'
         };
-        return expect(instance.processPayload(testPr))
-        .to.eventually.be.rejectedWith(/ignoring pull action/);
+        expect(function() { instance.generateVcsPayload(testPr); })
+          .to.throw(/ignoring pull action/);
       });
 
       it('rejects PR payloads that cannot be merged', function() {
         testPr.mergeable = false;
-        return expect(instance.processPayload(testPr))
-        .to.eventually.be.rejectedWith(/PR cannot be merged, ignoring/);
+        expect(function() { instance.generateVcsPayload(testPr); })
+          .to.throw(/PR cannot be merged, ignoring/);
       });
 
       it('rejects PR payloads where the user specifies us to ignore', function() {
         testPr.body = '@' + pluginConfig.auth.username + ' ignore';
-        return expect(instance.processPayload(testPr))
-        .to.eventually.be.rejectedWith(/user requested for PR to be ignored - /);
+        expect(function() { instance.generateVcsPayload(testPr); })
+          .to.throw(/user requested for PR to be ignored - /);
       });
     });
 
@@ -144,45 +138,43 @@ describe('plugins/vcs/github', function() {
           __headers: {'x-github-event': 'issue_comment'},
           issue: {}
         };
-        return expect(instance.processPayload(testComment))
-        .to.be.rejectedWith('Ignoring non-pull request issue notification');
+        expect(function() { instance.generateVcsPayload(testComment); })
+          .to.throw('Ignoring non-pull request issue notification');
       });
 
       it('ignores comments not directed @ CI user', function() {
         testComment = require('./test_comment')();
         testComment.comment.body = '@chr0n1x retest';
-        return expect(instance.processPayload(testComment))
-        .to.be.rejectedWith(/Not addressed @ me/);
+        expect(function() { instance.generateVcsPayload(testComment); })
+          .to.throw(/Not addressed @ me/);
       });
 
       it('ignores unknown commands', function() {
         testComment = require('./test_comment')();
         testComment.comment.body = '@' + pluginConfig.auth.username + ' ohai';
-        return expect(instance.processPayload(testComment))
-        .to.be.rejectedWith(/Ignoring unknown request: /);
+        expect(function() { instance.generateVcsPayload(testComment); })
+          .to.throw(/Ignoring unknown request: /);
       });
 
       it('can process issue_comment payloads', function() {
         apiStub = sinonSandbox.stub(instance, 'getPull');
-        apiStub.returns(q.resolve(require('./test_pr')()));
+        apiStub.returns(q(testPr));
         testComment = require('./test_comment')();
         testComment.comment.body = '@' + pluginConfig.auth.username + ' retest';
-        return expect(instance.processPayload(testComment))
-        .to.be.fulfilled
-        .then(function() {
-          return expect(publishSpy).to.be.calledWith('proposal');
-        });
+        return expect(instance.generateVcsPayload(testComment))
+          .to.be.fulfilled
+          .then(function(payload) {
+            return expect(payload)
+              .to.deep.equal(require('./test_proposal')());
+          });
       });
     });
 
     describe('=> push', function() {
       it('can process push payloads', function() {
         testPush = require('./test_push')();
-        return expect(instance.processPayload(testPush))
-        .to.be.fulfilled
-        .then(function() {
-          return expect(publishSpy).to.be.calledWith('change');
-        });
+        expect(instance.generateVcsPayload(testPush))
+          .to.deep.equal(require('./test_change')());
       });
     });
   });
