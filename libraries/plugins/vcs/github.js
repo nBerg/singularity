@@ -9,27 +9,6 @@ VcsPayload = require('../../payloads/vcs').VcsPayload;
 // thinking of a way to standardize logging...
 function logMsg(message) { return '[vcs.github] ' + message; }
 
-/**
- * Validates that a given payload is ok to parse / use, returns it
- *
- * @param {Object} payload Raw github event with a __headers array appended from
- *                         the HTTP Payload object
- * @return {Object} the same payload
- */
-function validateGithubPayload(payload) {
-  if (!payload.__headers) {
-    throw 'invalid payload - no __headers field';
-  }
-  if (!payload.__headers['x-github-event']) {
-    throw 'not a github event, ignoring';
-  }
-  if (!~allowed_events.indexOf(payload.__headers['x-github-event'])) {
-    throw 'unrecognized event "' +
-      payload.__headers['x-github-event'] +
-      '"';
-  }
-  return payload;
-}
 
 /**
  * Generates a VCS Payload from a push
@@ -38,7 +17,7 @@ function validateGithubPayload(payload) {
  * @return {Object} VCS Payload
  */
 function payloadFromPush(push) {
-  var payload = {
+  return {
     repo: push.repository.owner.name + '/' + push.repository.name,
     before: push.before,
     after: push.after,
@@ -52,12 +31,35 @@ function payloadFromPush(push) {
     status: null,
     repo_id: push.repository.id,
     change: push.compare.split('/').pop(),
-    change_id: push.after
+    change_id: push.after,
+    type: 'change'
   };
+}
 
-  (new VcsPayload(payload)).validate();
+/**
+ * Generates a VCS Payload from a RAW pull_request (not a webhook payload)
+ * ie: webhook_payload.pull_request, not webhook_payload
+ *
+ * @return {Object} VCS Payload
+ */
+function payloadFromPull(pull) {
+  return {
+    repo: pull.base.repo.full_name,
+    before: pull.base.sha,
+    after: pull.head.sha,
+    actor: pull.user.login,
 
-  return payload;
+    repo_url: pull.base.repo.ssh_url,
+    base_ref: pull.base.ref,
+    fork_url: pull.head.repo.ssh_url,
+    fork_ref: pull.head.ref,
+
+    status: statusOfPull(pull),
+    repo_id: pull.base.repo.id,
+    change: pull.number,
+    change_id: pull.id,
+    type: 'proposal'
+  };
 }
 
 /**
@@ -100,60 +102,6 @@ function validatePull(pull, auth_user) {
     throw 'user requested for PR to be ignored - ' + pr_name;
   }
   return pull;
-}
-
-/**
- * Generates a VCS Payload from a RAW pull_request (not a webhook payload)
- * ie: webhook_payload.pull_request, not webhook_payload
- *
- * @return {Object} VCS Payload
- */
-function payloadFromPull(pull) {
-  var payload = {
-    repo: pull.base.repo.full_name,
-    before: pull.base.sha,
-    after: pull.head.sha,
-    actor: pull.user.login,
-
-    repo_url: pull.base.repo.ssh_url,
-    base_ref: pull.base.ref,
-    fork_url: pull.head.repo.ssh_url,
-    fork_ref: pull.head.ref,
-
-    status: statusOfPull(pull),
-    repo_id: pull.base.repo.id,
-    change: pull.number,
-    change_id: pull.id
-  };
-
-  (new VcsPayload(payload)).validate();
-
-  return payload;
-}
-
-/**
- * MUST BIND `this` to this function!
- *
- * @param {Object} payload HTTP hook payload generated from github webhook
- * @return {Object} An object depending on the x-github-event value
- */
-function vcsPayload(payload, auth_user) {
-  var event = payload.__headers['x-github-event'],
-  commentPayload = pullFromComment.bind(this);
-
-  if (event === 'issue_comment') {
-    return q.all(['proposal', commentPayload(payload, auth_user)]);
-  }
-  if (event === 'pull_request') {
-    payload = validatePull(payload, auth_user);
-    return q.all(['proposal', payloadFromPull(payload)]);
-  }
-  if (event === 'push') {
-    return q.all(['change', payloadFromPush(payload)]);
-  }
-
-  throw 'invalid payload given ' +
-    JSON.stringify(payload).substring(0, 64) + '...';
 }
 
 /**
@@ -223,29 +171,49 @@ module.exports = require('../plugin').extend({
       host: option.host,
       port: option.port
     });
-    this.authenticate();
-  },
-
-  authenticate: function() {
     this._api.authenticate(this.config.auth);
   },
 
-  processPayload: function(payload) {
-    var defer = q.defer(),
-    promise = q.resolve(payload)
-    .then(validateGithubPayload)
-    .then(function(pl) {
-      return [pl, this.config.auth.username];
-    }.bind(this))
-    .spread(vcsPayload.bind(this))
-    .spread(this.publish.bind(this));
+  /**
+   * Validates that a given payload is ok to parse / use, returns it
+   *
+   * @param {Object} payload Raw github event with a __headers array appended from
+   *                         the HTTP Payload object
+   * @return {Object} the same payload
+   */
+  validatePayload: function(payload) {
+    if (!payload.__headers) {
+      throw 'invalid payload - no __headers field';
+    }
+    if (!payload.__headers['x-github-event']) {
+      throw 'not a github event, ignoring';
+    }
+    if (!~allowed_events.indexOf(payload.__headers['x-github-event'])) {
+      throw 'unrecognized event "' +
+        payload.__headers['x-github-event'] +
+        '"';
+    }
+    return payload;
+  },
 
-    promise.done(
-      function() { return defer.resolve(payload); },
-      function(reason) { return defer.reject(reason); }
-    );
+  generateVcsPayload: function (payload, auth_user) {
+    var event = payload.__headers['x-github-event'],
+    auth_user = this.config.auth.username;
 
-    return defer.promise;
+    if (event === 'issue_comment') {
+      return pullFromComment.call(this, payload, auth_user);
+    }
+    if (event === 'pull_request') {
+      // called because there is a *slight* difference between hook pull_request
+      // objects and ones pulled directly from the API
+      payload = validatePull(payload, auth_user);
+      return payloadFromPull(payload);
+    }
+    if (event === 'push') {
+      return payloadFromPush(payload);
+    }
+
+    throw 'invalid payload ' + JSON.stringify(payload).substring(0, 64) + '...';
   },
 
   start: function() {
@@ -300,7 +268,7 @@ module.exports = require('../plugin').extend({
    * @method pollRepos
    */
   pollRepos: function() {
-    return q.allSettled(this.config.repos.map(function(repo) {
+    return q.all(this.config.repos.map(function(repo) {
       var repo_owner = repo.split('/')[0],
       repo_name = repo.split('/')[1];
       // Getting PRs for each repo
@@ -323,9 +291,7 @@ module.exports = require('../plugin').extend({
             repo: repo_name,
             number: pull.number
           })
-          .then(function(pull) {
-            this.publish('proposal', payloadFromPull(pull));
-          }.bind(this));
+          .then(payloadFromPull(pull));
         }, this));
       }.bind(this))
       .catch(this.error);

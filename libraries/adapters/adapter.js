@@ -92,22 +92,12 @@ module.exports = require('../vent').extend({
     this._super(option);
     this.plugins = [];
     this.channel = this.setChannel(this.name);
-    this.start = this.start.bind(this);
-    this.delegateTask = this.delegateTask.bind(this);
-    this.injectPluginWorkflow = this.injectPluginWorkflow.bind(this);
+    this.executeInPlugins = this.executeInPlugins.bind(this);
     // do I know what I'm doing? obviously not.
     this.bound_fx = this.bound_fx || [];
     this.bound_fx.forEach(function(fx) {
       this[fx] = this[fx].bind(this);
     }, this);
-  },
-
-  /**
-   * Typically called by an external force to start internal
-   * processes, such as polling
-   */
-  start: function() {
-    this.delegateTask('start', arguments);
   },
 
   /**
@@ -142,8 +132,15 @@ module.exports = require('../vent').extend({
         return self.attachPlugin(plugin);
       })
     )
-    .then(self.start)
-    .done();
+    .done(
+      function(res) {
+        if (self.start) {
+          self.info('starting...');
+          return self.start();
+        }
+        self.error('no start method');
+      }
+    );
   },
 
   /**
@@ -151,7 +148,7 @@ module.exports = require('../vent').extend({
    * @return {Promise}
    */
   attachPlugin: function(plugin) {
-    return q.resolve(plugin)
+    return q(plugin)
     .then(validatePluginCfg.bind(this))
     .thenResolve(plugin)
     .then(pathFromName.bind(this))
@@ -163,55 +160,20 @@ module.exports = require('../vent').extend({
   },
 
   /**
-   * Delegates a fx call & args to all attached plugins
+   * Takes a callback executes it in the context of each plugin
    *
-   * @param {String} fx The function to call on each plugin
-   * @param {Array} args Arguments to invoke fx with, defaults
-   *                     to an empty array
-   * @return {Promise} Array of promises, an element for each
-   *                   call on plugin.fx
+   * @param {Function} callback The function to call on each plugin
+   * @param {*} data Argument to invoke callback with
+   * @return {*[]} arr of results for each plugin that the callback was
+   *               invoked for
    */
-  delegateTask: function(fx, args) {
-    var self = this;
+  executeInPlugins: function(callback, data) {
     return q.fcall(validateHasPlugins.bind(this))
-    .allSettled(
-      self.plugins.map(function(plugin) {
-        return q.resolve(plugin)
-        .then(function(instance) {
-          self.debug(
-            '[delegateTask]',
-            {
-              task: fx,
-              adapter: self.name,
-              plugin: instance.name
-            }
-          );
-          return instance;
-        })
-        .post(fx, args)
-        .catch(self.error);
+    .thenResolve(
+      this.plugins.map(function(plugin) {
+        return q(data).then(callback.bind(plugin));
       })
     )
-    .catch(this.error)
-    .done();
-  },
-
-  injectPluginWorkflow: function(callback, data) {
-    var self = this;
-    return q.fcall(validateHasPlugins.bind(this))
-    .allSettled(
-      self.plugins.map(function(plugin) {
-        var defer = q.defer();
-        q.resolve([plugin, data])
-        .spread(callback.bind(self))
-        .done(
-          function(res) { return defer.resolve(res); },
-          function(reason) { return defer.reject(reason); }
-        );
-        return defer.promise;
-      })
-    )
-    .catch(this.error)
-    .done();
+    .then(q.all);
   }
 });
