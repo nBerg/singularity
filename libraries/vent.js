@@ -58,7 +58,7 @@ module.exports = require('nbd/Class').extend({
     if (!this.channel) {
       this.error(
         'cannot publish topic, no channel',
-        {topic: topic, vent: this.name}
+        {channel: this.name, topic: topic}
       );
       return;
     }

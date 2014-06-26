@@ -5,11 +5,6 @@ allowed_events = ['issue_comment', 'pull_request', 'push'],
 allowed_pr_actions = ['synchronize', 'opened'],
 VcsPayload = require('../../payloads/vcs').VcsPayload;
 
-// wrapper functions for logging messages, cause...I haven't even started
-// thinking of a way to standardize logging...
-function logMsg(message) { return '[vcs.github] ' + message; }
-
-
 /**
  * Generates a VCS Payload from a push
  *
@@ -246,10 +241,10 @@ module.exports = require('../plugin').extend({
     .catch(this.error)
     .done(function(pull) {
       if (!pull) {
-        reqPromise.reject(logMsg(
+        reqPromise.reject(
           'could not get PR for issue_comment; ' +
           JSON.stringify(prQuery)
-        ));
+        );
         return;
       }
       reqPromise.resolve(pull);
