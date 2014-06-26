@@ -1,6 +1,7 @@
 "use strict";
 
-var winston = require('winston'),
+var postal = require('postal'),
+winston = require('winston'),
 logger = new winston.Logger({
   transports: [
     new (winston.transports.Console)()
@@ -8,33 +9,63 @@ logger = new winston.Logger({
 });
 logger.cli();
 
-function formatLogArgs(args) {
-  args = Array.prototype.slice.call(args);
-  args[0] = (typeof args[0] === 'string') ? args[0] : args[0].toString();
-  return args;
+function logPrepend(type, name) {
+  return '[' + type + '.' + name + '] ';
 }
 
 // vent: something turns a bunch of knobs
 // ...and things just keep coming out
 // ...of all the...holes...? :|
 module.exports = require('nbd/Class').extend({
+  channel: undefined,
+
   init: function(option) {
+    if (!this.objectType) {
+      throw Error('objectType must be assigned to this object');
+    }
+    if (!this.name) {
+      throw 'No adapter name defined';
+    }
     this.config = option;
     this.log = this.log || logger;
     this.info = this.info.bind(this);
     this.debug = this.debug.bind(this);
     this.error = this.error.bind(this);
+    this.publish = this.publish.bind(this);
+  },
+
+  formatLogs: function(args) {
+    args = Array.prototype.slice.call(args);
+    args[0] = (typeof args[0] === 'string') ?
+      args[0] : args[0].toString();
+    args[0] =  logPrepend(this.objectType, this.name) + args[0];
+    return args;
   },
 
   info: function() {
-    this.log.info.apply(this.log, formatLogArgs(arguments));
+    this.log.info.apply(this.log, this.formatLogs(arguments));
   },
 
   debug: function() {
-    this.log.debug.apply(this.log, formatLogArgs(arguments));
+    this.log.debug.apply(this.log, this.formatLogs(arguments));
   },
 
   error: function() {
-    this.log.error.apply(this.log, formatLogArgs(arguments));
+    this.log.error.apply(this.log, this.formatLogs(arguments));
+  },
+
+  publish: function(topic, data) {
+    if (!this.channel) {
+      this.error(
+        'cannot publish topic, no channel',
+        {topic: topic, vent: this.name}
+      );
+      return;
+    }
+    this.channel.publish(topic, data);
+  },
+
+  setChannel: function(channelName) {
+    this.channel = postal.channel(channelName);
   }
 });

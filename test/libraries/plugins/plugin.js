@@ -1,9 +1,12 @@
-var Plugin = require('../../../libraries/plugins/plugin'),
-chai = require('chai'),
+var chai = require('chai'),
 expect = chai.expect,
 sinon = require('sinon');
 
 chai.use(require('sinon-chai'));
+
+var Plugin = require('../../../libraries/plugins/plugin').extend({
+  name: 'testPlugin'
+});
 
 describe('Plugin', function() {
   // stubbing like this because...libs use singletons
