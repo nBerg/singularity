@@ -27,7 +27,7 @@ module.exports = [
     {channel: 'build', topic: 'pull_request.triggered', adapter: 'db', callback: 'insertPullRequestJob'},
     {channel: 'build', topic: 'pull_request.triggered', adapter: 'publisher', callback: 'createPendingStatus'},
     // once stored, update status with build link
-    {channel: 'db', topic: 'pull_request.build_stored', adapter: 'publisher', callback: 'createStatus'},
+    {channel: 'db', topic: 'pull_request.build_stored', adapter: 'publisher', callback: 'createPendingStatus'},
 
     // ISSUE COMMENT CHAIN
     // depending on whether the callback publishes an event or not, the rest of the chain *should* be
