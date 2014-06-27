@@ -1,18 +1,56 @@
 "use strict";
 
 var q = require('q'),
-allowed_events = ['pull_request', 'retest', 'push'];
+VcsPayload = require('../payloads/vcs').VcsPayload;
+
+function validateVcsPayload(vcsPayload) {
+  new VcsPayload(vcsPayload).validate();
+  return vcsPayload;
+}
+
+function poll() {
+  return this.pollRepos();
+}
+
+function processPayload(payload) {
+  return q(payload)
+  .then(this.validatePayload.bind(this))
+  .thenResolve(payload)
+  .then(this.generateVcsPayload.bind(this))
+  .then(validateVcsPayload);
+}
 
 module.exports = require('./adapter').extend({
   name: 'vcs',
   pluginType: 'vcs',
-  bound_fx: ['handleRequest'],
+
+  /**
+   * Typically called by an external force to start internal
+   * processes, such as polling
+   */
+  start: function() {
+    var self = this;
+    this.executeInPlugins(poll)
+    .then(function(allPluginResults) {
+      allPluginResults.forEach(function(pluginResults) {
+        pluginResults.forEach(function(payload) {
+          this.publish(payload.type, payload);
+        }, this);
+      }, this);
+    }.bind(this))
+    .done();
+  },
 
   handleRequest: function(payload) {
-    this.log.debug(
-      '[vcs.payload_received]',
+    this.debug(
+      '[payload_received]',
       JSON.stringify(payload).substring(0, 64) + '...'
     );
-    this.delegateTask('processPayload', payload);
+    this.executeInPlugins(processPayload, payload)
+    .then(function(payloads) {
+      payloads.forEach(function(payload) {
+        this.publish(payload.type, payload);
+      }, this);
+    }.bind(this));
   }
 });
