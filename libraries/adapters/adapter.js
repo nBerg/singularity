@@ -1,8 +1,9 @@
 "use strict";
 
-var q = require('q'),
-path = require('path'),
-fs = require('fs');
+var postal = require('postal'),
+    q = require('q'),
+    path = require('path'),
+    fs = require('fs');
 
 /**
  * MUST BIND `this`
@@ -72,12 +73,27 @@ function loadFromPath(plugin, path) {
   var klass = require(path),
   instance = new klass(this.config.get(plugin));
   instance.log = this.log;
-  instance.setChannel(this.name);
   this.plugins.push(instance);
 }
 
 module.exports = require('../vent').extend({
+  channel: undefined,
   objectType: 'adapter',
+
+  publish: function(topic, data) {
+    if (!this.channel) {
+      this.error(
+        'cannot publish topic, no channel',
+        {channel: this.name, topic: topic}
+      );
+      return;
+    }
+    this.channel.publish(topic, data);
+  },
+
+  setChannel: function(channelName) {
+    this.channel = postal.channel(channelName);
+  },
 
   /**
    * {@inheritDoc}
@@ -91,8 +107,10 @@ module.exports = require('../vent').extend({
     option = require('nconf').defaults(option);
     this._super(option);
     this.plugins = [];
-    this.channel = this.setChannel(this.name);
     this.executeInPlugins = this.executeInPlugins.bind(this);
+    this.publish = this.publish.bind(this);
+    this.setChannel = this.setChannel.bind(this);
+    this.setChannel(this.name);
     // do I know what I'm doing? obviously not.
     this.bound_fx = this.bound_fx || [];
     this.bound_fx.forEach(function(fx) {

@@ -1,13 +1,12 @@
 "use strict";
 
-var postal = require('postal'),
-winston = require('winston'),
-logger = new winston.Logger({
-  transports: [
-    new (winston.transports.Console)()
-  ]
-});
-logger.cli();
+var winston = require('winston'),
+    logger = new winston.Logger({
+      transports: [
+        new (winston.transports.Console)()
+      ]
+    });
+    logger.cli();
 
 function logPrepend(type, name) {
   return '[' + type + '.' + name + '] ';
@@ -17,8 +16,6 @@ function logPrepend(type, name) {
 // ...and things just keep coming out
 // ...of all the...holes...? :|
 module.exports = require('nbd/Class').extend({
-  channel: undefined,
-
   init: function(option) {
     if (!this.objectType) {
       throw Error('objectType must be assigned to this object');
@@ -31,7 +28,6 @@ module.exports = require('nbd/Class').extend({
     this.info = this.info.bind(this);
     this.debug = this.debug.bind(this);
     this.error = this.error.bind(this);
-    this.publish = this.publish.bind(this);
   },
 
   formatLogs: function(args) {
@@ -52,20 +48,5 @@ module.exports = require('nbd/Class').extend({
 
   error: function() {
     this.log.error.apply(this.log, this.formatLogs(arguments));
-  },
-
-  publish: function(topic, data) {
-    if (!this.channel) {
-      this.error(
-        'cannot publish topic, no channel',
-        {channel: this.name, topic: topic}
-      );
-      return;
-    }
-    this.channel.publish(topic, data);
-  },
-
-  setChannel: function(channelName) {
-    this.channel = postal.channel(channelName);
   }
 });
