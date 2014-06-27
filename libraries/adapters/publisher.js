@@ -16,27 +16,26 @@ module.exports = require('./adapter').extend({
       switch status
       case queued:
         paylod.message = 'job has been added to queue'
-        res = plugin.createQueuedStatus(payload)
       case building:
         payload.message = 'currently running'
-        res = plugin.createBuildingStatus(payload)
       case success:
         payload.message = 'successfully built'
-        res = plugin.createSuccessStatus(payload)
       case failure:
         payload.message = 'failed to build'
-        res = plugin.createFailureStatus(payload)
       case error:
         payload.message = 'There was an error trying to test this pr'
-        res = plugin.createErrorStatus(payload)
       default:
         shouldn't ever get here cuz validated, but throw some sort of error
+
+      res = plugin.createStatus(payload)
 
 
       if (res == success)
         // Does this need to return some payload?
+        validatePublisherPayload(res)
         publish('published.success')
       else
+        validatePublisherPayload(res)
         publish('published.error')
      */
   }
