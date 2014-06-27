@@ -14,20 +14,9 @@ module.exports = require('./adapter').extend({
     this._super(option);
   },
 
-  checkPullRequestJob: function(pull) {
+  buildChange: function(changePayload) {
   },
 
-  checkPushJob: function(push) {
-  },
-
-  triggerBuild: function(req_body) {
-    return q.resolve(req_body)
-    .then(validateOpts)
-    .then(function(opts) {
-      return ['triggerBuild', opts];
-    })
-    .spread(this.delegateTask)
-    .catch(this.error)
-    .done();
+  buildProposal: function(proposalPayload) {
   }
 });
