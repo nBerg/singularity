@@ -75,16 +75,15 @@ describe('plugins/vcs/github', function() {
   });
 
   describe('#generateVcsPayload', function() {
-    var testPr, testPush, testComment, publishSpy, apiStub;
+    var testPr, testPush, testComment, apiStub;
 
     beforeEach(function(done) {
       testPr = require('./test_pr')();
-      publishSpy = sinonSandbox.spy(instance, 'publish');
       done();
     });
 
     describe('=> pull_request', function() {
-      it('publishes plain pull_request payloads', function() {
+      it('processes plain pull_request payloads', function() {
         expect(instance.generateVcsPayload(testPr))
           .to.deep.equal(require('./test_proposal')());
       });
