@@ -31,5 +31,7 @@
     "it": false
   },
 
-  "node": true
+  "node": true,
+
+  "validthis": true
 }

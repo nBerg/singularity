@@ -1,89 +1,93 @@
-// "use strict";
-//
-// var GitHubApi = require('github'),
-// async = require('async'),
-// q = require('q');
-//
+"use strict";
+
+var GitHubApi = require('github'),
+    q = require('q'),
+    PublisherPayload = require('../../payloads/publisher').PublisherPayload;
+
+function logMsg(message) { return '[publisher.github] ' + message; }
+// function throwError(message) { throw logMsg(message); }
+
+/**
+ * MUST BIND `this`
+ *
+ * Uses the GitHub API to create a commit status for a ref
+ * https://developer.github.com/v3/repos/statuses/
+ *
+ * @method createStatus
+ * @param owner {String}
+ * @param repo {String}
+ * @param sha {String}
+ * @param state {String}
+ * @param target_url {String}
+ * @param description {String}
+ */
+function createGithubStatus(owner, repo, sha, state, targetUrl, description) {
+
+  logMsg('creating status ' + state + ' for sha ' + sha);
+
+  var hash = {
+    user: owner,
+    repo: repo,
+    sha: sha,
+    state: state,
+    target_url: targetUrl,
+    description: description
+  };
+
+  return q.ninvoke(this._api.statuses, 'create', hash)
+  .then(function(response) {
+    return response;
+  })
+  .catch(this.error);
+}
+
+function buildPublisherPayload(payload, githubResponse) {
+  return new PublisherPayload({
+    repo: payload.data.repo,
+    owner: payload.data.owner,
+    sha: payload.data.sha,
+    status: payload.data.status,
+    buildLink: payload.data.buildLink,
+    type: (githubResponse.state ? 'statusUpdate' : 'comment'),
+    publishedMessage: githubResponse.description
+  });
+}
+
 module.exports = require('../plugin').extend({
-//   init: function(option) {
-//     this._super(option);
-//     this._api = new GitHubApi({
-//       version: '3.0.0',
-//       host: option.host,
-//       port: option.port
-//     });
-//     this.authenticate();
-//   },
-//
-//   addRepo: function(data) {
-//     if (!data.repo || !data.organization) {
-//       throw 'Missing repo or organization in passed data';
-//     }
-//
-//     if (!this.config.repos) {
-//       this.config.repos = [];
-//     }
-//
-//     this.log.info('GitHub Lib: adding repo', data.repo);
-//     this.config.repos.push(data.repo);
-//
-//     return this.setupRepoHook(data.repo);
-//   },
-//
-//   /**
-//    * Sets up the GitHub plugin. Depending on the selecting configs either a webserver
-//    * will be setup for receiving webhook events or asynchronous polling will be setup.
-//    *
-//    * @method start
-//    */
-  start: function() {
-//     if (this.config.method === 'hooks') {
-//       this.checkRepos();
-//       return this;
-//     }
-//
-//     var self = this;
-//     async.parallel({
-//       github: function() {
-//         var run_github = function() {
-//           self.checkRepos();
-//           setTimeout(run_github, self.config.frequency);
-//         };
-//
-//         run_github();
-//       }
-//     });
-//
-//     return this;
+  name: 'github',
+
+  init: function(option) {
+    this._super(option);
+    this._api = new GitHubApi({
+      version: '3.0.0',
+      host: option.host,
+      port: option.port
+    });
+    this.authenticate();
   },
-//
-//   authenticate: function() {
-//     this._api.authenticate(this.config.auth);
-//   },
-//
-//   /**
-//    * Uses the GitHub API to create a Merge Status for a pull request.
-//    *
-//    * @method createStatus
-//    * @param sha {String}
-//    * @param user {String}
-//    * @param repo {String}
-//    * @param state {String}
-//    * @param build_url {String}
-//    * @param description {String}
-//    */
-//   createStatus: function(sha, user, repo, state, build_url, description) {
-//     this.log.info('creating status ' + state + ' for sha ' + sha + ' for build_url ' + build_url);
-//     return q.ninvoke(this._api.statuses, 'create', {
-//       user: user,
-//       repo: repo,
-//       sha: sha,
-//       state: state,
-//       target_url: build_url,
-//       description: description
-//     })
-//     .catch(this.error);
-//   },
+
+  authenticate: function() {
+    this._api.authenticate(this.config.auth);
+  },
+
+  createStatus: function(payload) {
+    var state = payload.data.status;
+    if (state === 'queued' || state === 'building') {
+      state = 'pending';
+    }
+
+    return createGithubStatus.call(this,
+             payload.data.owner,
+             payload.data.repo,
+             payload.data.sha,
+             state,
+             payload.data.buildLink,
+             payload.data.message
+           )
+           .then(buildPublisherPayload.bind(this, payload))
+           .catch(this.error);
+  }
+
 //
 //   /**
 //    * Uses the GitHub API to create an inline comment on the diff of a pull request.

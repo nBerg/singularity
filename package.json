@@ -21,15 +21,16 @@
     "winston": ">=0.6.2"
   },
   "devDependencies": {
-    "grunt-cli": "~0.1.9",
+    "chai": "~1.9",
+    "chai-as-promised": "~4.1.1",
     "grunt": "0.4.2",
+    "grunt-cli": "~0.1.9",
     "grunt-contrib-jshint": "~0.10",
     "grunt-jscs-checker": "0.4.2",
     "grunt-mocha-test": "~0.10.2",
     "mocha": "~1.18.2",
-    "chai": "~1.9",
+    "replay": "^1.10.3",
     "sinon": "~1.9.1",
-    "sinon-chai": "~2.5",
-    "chai-as-promised": "~4.1.1"
+    "sinon-chai": "~2.5"
   }
 }
