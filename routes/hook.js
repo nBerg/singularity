@@ -1,6 +1,6 @@
 var range_check = require('range_check'),
-q = require('q'),
-payload = require('../libraries/payloads/http');
+    q = require('q'),
+    payload = require('../libraries/payloads/http');
 
 // We only want to accept local requests and GitHub requests. See the Service
 // Hooks page of any repo you have admin access to to see the list of GitHub
@@ -32,24 +32,11 @@ function ipCheck(request) {
   };
 }
 
-function preparePayload(request) {
-  var pl;
-  try {
-    pl = payload('hook.payload', request);
-  }
-  catch(err) {
-    throw {
-      status: 422,
-      message: err.message
-    };
-  }
-  return pl;
-}
-
 function handleRequest(request) {
   return q(request)
   .then(ipCheck)
-  .then(preparePayload);
+  .then(function(req) { return ['hook.payload', req]; })
+  .spread(payload.preparePayload);
 }
 
 handleRequest.method = "post";
