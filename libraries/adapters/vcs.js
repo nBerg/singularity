@@ -3,23 +3,13 @@
 var q = require('q'),
 VcsPayload = require('../payloads/vcs').VcsPayload;
 
-function startPolling() {
-  if (this.config.method === 'hooks') {
-    this.debug('using hooks, performing startup PR scan.');
-    this.pollRepos();
-    return;
-  }
-  var self = this,
-  frequency = self.config.frequency || 4000;
-  async.parallel({
-    poll: function() {
-      var poll_repos = function() {
-        self.pollRepos();
-        setTimeout(poll_repos, frequency);
-      };
-      poll_repos();
-    }
-  });
+function validateVcsPayload(vcsPayload) {
+  new VcsPayload(vcsPayload).validate();
+  return vcsPayload;
+}
+
+function poll() {
+  return this.pollRepos();
 }
 
 function processPayload(payload) {
@@ -27,10 +17,7 @@ function processPayload(payload) {
   .then(this.validatePayload.bind(this))
   .thenResolve(payload)
   .then(this.generateVcsPayload.bind(this))
-  .then(function(vcsPayload) {
-    new VcsPayload(vcsPayload).validate();
-    return vcsPayload;
-  });
+  .then(validateVcsPayload);
 }
 
 module.exports = require('./adapter').extend({
@@ -42,7 +29,16 @@ module.exports = require('./adapter').extend({
    * processes, such as polling
    */
   start: function() {
-    this.executeInPlugins(startPolling);
+    var self = this;
+    this.executeInPlugins(poll)
+    .then(function(allPluginResults) {
+      allPluginResults.forEach(function(pluginResults) {
+        pluginResults.forEach(function(payload) {
+          this.publish(payload.type, payload);
+        }, this);
+      }, this);
+    }.bind(this))
+    .done();
   },
 
   handleRequest: function(payload) {

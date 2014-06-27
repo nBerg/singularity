@@ -263,7 +263,8 @@ module.exports = require('../plugin').extend({
    * @method pollRepos
    */
   pollRepos: function() {
-    return q.all(this.config.repos.map(function(repo) {
+    var pullList = [];
+    return q.allSettled(this.config.repos.map(function(repo) {
       var repo_owner = repo.split('/')[0],
       repo_name = repo.split('/')[1];
       // Getting PRs for each repo
@@ -272,7 +273,7 @@ module.exports = require('../plugin').extend({
         repo: repo_name,
         state: 'open'
       })
-      .then(function getPR(resp) {
+      .then(function getPRs(resp) {
         return q.allSettled(Object.keys(resp)
         .map(function(i) { return resp[i]; })
         .filter(function(pull) {
@@ -286,10 +287,29 @@ module.exports = require('../plugin').extend({
             repo: repo_name,
             number: pull.number
           })
+          .then(function(pull) {
+            return pull;
+          })
           .then(payloadFromPull(pull));
-        }, this));
+        }, this))
+        .then(function(promiseSnapshots) {
+          return promiseSnapshots.filter(function(snapshot) {
+            return snapshot.state === 'fulfilled';
+          })
+          .map(function(snapshot) {
+            return snapshot.value;
+          });
+        })
       }.bind(this))
+      .then(function(repoPulls) {
+        pullList = pullList.concat(repoPulls);
+      })
       .catch(this.error);
-    }, this));
+    }, this))
+    .then(function() {
+      return pullList.map(function(pull) {
+        return payloadFromPull(pull);
+      });
+    });
   }
 });
