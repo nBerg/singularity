@@ -5,13 +5,13 @@ path = require('path'),
 fs = require('fs');
 
 /**
- * Util fx to throw errors with a nice "tag"
- *
- * @param {String} name
- * @param {*} message
+ * MUST BIND `this`
+ * Validates that `this` has plugins
  */
-function adapterError(name, message) {
-  throw '[adapter.' + name + '] ' + message;
+function validateHasPlugins() {
+  if (this.plugins.length === 0) {
+    throw 'no plugins attached';
+  }
 }
 
 /**
@@ -55,12 +55,9 @@ function pathFromName(plugin) {
   filePath = internalPluginPath(this.pluginType, plugin);
   cfgPath = fs.existsSync(cfgPath) ? cfgPath : false;
   if (!cfgPath && !fs.existsSync(filePath)) {
-    adapterError(
-      this.name,
-      'plugin_path cfg not defined (or does not exist) & ' +
+    throw 'plugin_path cfg not defined (or does not exist) & ' +
       filePath +
-      ' does not exist'
-    );
+      ' does not exist';
   }
   return (cfgPath) ? cfgPath : filePath;
 }
@@ -80,30 +77,22 @@ function loadFromPath(plugin, path) {
 }
 
 module.exports = require('../vent').extend({
-  /**
-   * Typically called by an external force to start internal
-   * processes, such as polling
-   */
-  start: function() {
-    this.delegateTask('start', arguments);
-  },
+  objectType: 'adapter',
 
   /**
    * {@inheritDoc}
    * @param {Object} option Configuration
    */
   init: function(option) {
+    // used to build out paths to plugins (if none given)
     if (!this.pluginType) {
       throw 'No pluginType defined';
     }
-    if (!this.name) {
-      throw 'No adapter name defined';
-    }
     option = require('nconf').defaults(option);
     this._super(option);
-    this.delegateTask = this.delegateTask.bind(this);
-    this.start = this.start.bind(this);
     this.plugins = [];
+    this.channel = this.setChannel(this.name);
+    this.executeInPlugins = this.executeInPlugins.bind(this);
     // do I know what I'm doing? obviously not.
     this.bound_fx = this.bound_fx || [];
     this.bound_fx.forEach(function(fx) {
@@ -136,15 +125,22 @@ module.exports = require('../vent').extend({
 
     return q.allSettled(
       plugins.map(function(plugin) {
-        self.log.debug(
-          '[adapter.' + self.name + '.plugin_load]',
+        self.debug(
+          'plugin_load',
           {plugin: plugin}
         );
         return self.attachPlugin(plugin);
       })
     )
-    .then(self.start)
-    .done();
+    .done(
+      function(res) {
+        if (self.start) {
+          self.info('starting...');
+          return self.start();
+        }
+        self.error('no start method');
+      }
+    );
   },
 
   /**
@@ -152,7 +148,7 @@ module.exports = require('../vent').extend({
    * @return {Promise}
    */
   attachPlugin: function(plugin) {
-    return q.resolve(plugin)
+    return q(plugin)
     .then(validatePluginCfg.bind(this))
     .thenResolve(plugin)
     .then(pathFromName.bind(this))
@@ -164,42 +160,20 @@ module.exports = require('../vent').extend({
   },
 
   /**
-   * Delegates a fx call & args to all attached plugins
+   * Takes a callback executes it in the context of each plugin
    *
-   * @param {String} fx The function to call on each plugin
-   * @param {Array} args Arguements to invoke fx with, defauts
-   *                     to an empty array
-   * @return {Promise} Array of promises, an element for each
-   *                   call on plugin.fx
+   * @param {Function} callback The function to call on each plugin
+   * @param {*} data Argument to invoke callback with
+   * @return {*[]} arr of results for each plugin that the callback was
+   *               invoked for
    */
-  delegateTask: function(fx, args) {
-    if (this.plugins.length === 0) {
-      return q.resolve([this.name, 'no plugins to delegate to'])
-      .spread(adapterError)
-      .catch(this.error)
-      .done();
-    }
-    args = Array.isArray(args) ? args : [args]
-    var self = this,
-    promises = this.plugins.map(function(plugin) {
-      return q.resolve(plugin)
-      .then(function(instance) {
-        self.log.debug(
-          '[adapter.delegateTask]',
-          {
-            task: fx,
-            adapter: self.name,
-            plugin: instance.name
-          }
-        );
-        return instance;
+  executeInPlugins: function(callback, data) {
+    return q.fcall(validateHasPlugins.bind(this))
+    .thenResolve(
+      this.plugins.map(function(plugin) {
+        return q(data).then(callback.bind(plugin));
       })
-      .post(fx, args)
-      .catch(self.error);
-    });
-
-    return q.allSettled(promises)
-    .catch(this.error)
-    .done();
+    )
+    .then(q.all);
   }
 });
