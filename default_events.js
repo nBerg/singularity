@@ -25,7 +25,7 @@ module.exports = [
     {channel: 'db', topic: 'pull_request.not_found', adapter: 'build', callback: 'buildPullRequest'},
     // store data on the triggered job
     {channel: 'build', topic: 'pull_request.triggered', adapter: 'db', callback: 'insertPullRequestJob'},
-    {channel: 'build', topic: 'pull_request.triggered', adapter: 'publisher', callback: 'createPendingStatus'},
+    {channel: 'build', topic: 'pull_request.triggered', adapter: 'publisher', callback: 'createStatus'},
     // once stored, update status with build link
     {channel: 'db', topic: 'pull_request.build_stored', adapter: 'publisher', callback: 'createStatus'},
 
