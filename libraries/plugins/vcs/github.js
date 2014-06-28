@@ -135,23 +135,24 @@ function validateCommentPayload(comment, auth_user) {
  * @return {Object} from payloadFromPull
  */
 function pullFromComment(comment, auth_user) {
-  validateCommentPayload(comment, auth_user);
+  return q([comment, auth_user])
+  .spread(validateCommentPayload)
+  .then(function() {
+    this.debug(
+      'Received retest request for pull',
+      {
+        pull_number: comment.issue.number,
+        repo: comment.repository.name
+      }
+    );
 
-  this.debug(
-    'Received retest request for pull',
-    {
-      pull_number: comment.issue.number,
-      repo: comment.repository.name
-    }
-  );
-
-  return this.getPull({
-    user: comment.repository.owner.login,
-    repo: comment.repository.name,
-    number: comment.issue.number
-  })
-  .then(payloadFromPull)
-  .catch(this.error);
+    return this.getPull({
+      user: comment.repository.owner.login,
+      repo: comment.repository.name,
+      number: comment.issue.number
+    });
+  }.bind(this))
+  .then(payloadFromPull);
 }
 
 /**
@@ -235,8 +236,7 @@ module.exports = require('../plugin').extend({
       return q([payload, auth_user])
       .spread(validateAndStandardizePull)
       .then(this.ensureNewPull.bind(this))
-      .then(payloadFromPull)
-      .catch(this.error);
+      .then(payloadFromPull);
     }
     if (event === 'push') {
       return q(payload).then(payloadFromPush);
@@ -352,7 +352,6 @@ module.exports = require('../plugin').extend({
           return !!payload;
         });
       });
-    }.bind(this))
-    .catch(this.error);
+    }.bind(this));
   }
 });
