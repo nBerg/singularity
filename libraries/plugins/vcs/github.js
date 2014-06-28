@@ -1,9 +1,10 @@
 var GitHubApi = require('github'),
-async = require('async'),
-q = require('q'),
-allowed_events = ['issue_comment', 'pull_request', 'push'],
-allowed_pr_actions = ['synchronize', 'opened'],
-VcsPayload = require('../../payloads/vcs').VcsPayload;
+    async = require('async'),
+    q = require('q'),
+    allowed_events = ['issue_comment', 'pull_request', 'push'],
+    allowed_pr_actions = ['synchronize', 'opened'],
+    shaStatuses = ['pending', 'success', 'error', 'failure'],
+    VcsPayload = require('../../payloads/vcs').VcsPayload;
 
 /**
  * Generates a VCS Payload from a push
@@ -76,7 +77,7 @@ function statusOfPull(pull) {
 /**
  * Checks & validates pull object, whether it should be ignored
  */
-function validatePull(pull, auth_user) {
+function validateAndStandardizePull(pull, auth_user) {
   var pr_name;
   // decide whether this came from a webhook or an API call made internally
   if (pull.pull_request) {
@@ -191,21 +192,54 @@ module.exports = require('../plugin').extend({
     return payload;
   },
 
+  /**
+   * Gets the latest status of a given PR github event
+   *
+   * @param {Object} payload Raw github event
+   * @return {Object} status object
+   */
+  ensureNewPull: function(payload) {
+    var query = {
+      user: payload.base.user.login,
+      repo: payload.base.repo.name,
+      sha: payload.head.sha
+    };
+    return q.ninvoke(this._api.statuses, 'get', query)
+    .then(function(statuses) {
+      if (statuses && statuses[0]) {
+        return statuses[0];
+      }
+      throw 'no statuses found for ' + JSON.stringify(query);
+    })
+    .then(function(latestStatus) {
+      if (~shaStatuses.indexOf(latestStatus.state)) {
+        throw 'status already created for ' +
+          payload.base.repo.full_name + ' #' + payload.number;
+      }
+    })
+    // not sure why .thenResolve does not work here...
+    .then(function() { return payload; });
+  },
+
   generateVcsPayload: function (payload, auth_user) {
     var event = payload.__headers['x-github-event'],
     auth_user = this.config.auth.username;
 
     if (event === 'issue_comment') {
+      // yes, returns a promise
       return pullFromComment.call(this, payload, auth_user);
     }
     if (event === 'pull_request') {
       // called because there is a *slight* difference between hook pull_request
       // objects and ones pulled directly from the API
-      payload = validatePull(payload, auth_user);
-      return payloadFromPull(payload);
+      return q([payload, auth_user])
+      .spread(validateAndStandardizePull)
+      .then(this.ensureNewPull.bind(this))
+      .then(payloadFromPull)
+      .catch(this.error);
     }
     if (event === 'push') {
-      return payloadFromPush(payload);
+      return q(payload).then(payloadFromPush);
     }
 
     throw 'invalid payload ' + JSON.stringify(payload).substring(0, 64) + '...';
@@ -281,7 +315,7 @@ module.exports = require('../plugin').extend({
         })
         .map(function getPRDetails(pull) {
           // Currently the GitHub API doesn't provide the same information for
-          // polling as it does when requesting a single, specific, pull request.
+          // polling as it does when requesting a single, specific, pull request
           return this.getPull({
             user: repo_owner,
             repo: repo_name,
@@ -289,8 +323,7 @@ module.exports = require('../plugin').extend({
           })
           .then(function(pull) {
             return pull;
-          })
-          .then(payloadFromPull(pull));
+          });
         }, this))
         .then(function(promiseSnapshots) {
           return promiseSnapshots.filter(function(snapshot) {
@@ -303,13 +336,23 @@ module.exports = require('../plugin').extend({
       }.bind(this))
       .then(function(repoPulls) {
         pullList = pullList.concat(repoPulls);
-      })
-      .catch(this.error);
+      });
     }, this))
     .then(function() {
-      return pullList.map(function(pull) {
-        return payloadFromPull(pull);
+      return q.all(
+        pullList.map(function(pull) {
+          return q(pull)
+          .then(this.ensureNewPull.bind(this))
+          .then(payloadFromPull)
+          .catch(this.error);
+        }.bind(this))
+      )
+      .then(function(allPayloads) {
+        return allPayloads.filter(function(payload) {
+          return !!payload;
+        });
       });
-    });
+    }.bind(this))
+    .catch(this.error);
   }
 });

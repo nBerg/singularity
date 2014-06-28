@@ -31,9 +31,13 @@ module.exports = require('./adapter').extend({
   start: function() {
     var self = this;
     this.executeInPlugins(poll)
-    .then(function(allPluginResults) {
-      allPluginResults.forEach(function(pluginResults) {
+    .then(function(validPluginResults) {
+      validPluginResults.forEach(function(pluginResults) {
         pluginResults.forEach(function(payload) {
+          this.debug(
+            '[polling_payload]',
+            JSON.stringify(payload).substring(0, 64) + '...'
+          );
           this.publish(payload.type, payload);
         }, this);
       }, this);
