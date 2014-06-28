@@ -272,7 +272,6 @@ module.exports = require('../plugin').extend({
     var reqPromise = q.defer();
 
     q.ninvoke(this._api.pullRequests, 'get', query)
-    .catch(this.error)
     .done(function(pull) {
       if (!pull) {
         reqPromise.reject(
