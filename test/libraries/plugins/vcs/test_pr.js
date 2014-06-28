@@ -10,6 +10,9 @@ module.exports = function() {
     base: {
       ref: 'refs/heads/master',
       sha: 'pr_base_sha',
+      user: {
+        login: 'pr_base_repo_owner'
+      },
       repo: {
         id: 123,
         full_name: 'foo/bar',
@@ -24,7 +27,7 @@ module.exports = function() {
       }
     },
     user: {
-      login: 'pr_foo_user'
+      login: 'pr_fork_user'
     }
   };
 };
