@@ -189,7 +189,9 @@ module.exports = require('../vent').extend({
     return q.fcall(validateHasPlugins.bind(this))
     .thenResolve(
       this.plugins.map(function(plugin) {
-        return q(data).then(callback.bind(plugin));
+        return q(data)
+        .then(callback.bind(plugin))
+        .catch(plugin.error);
       })
     )
     .then(q.all);
