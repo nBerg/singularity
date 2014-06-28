@@ -1,6 +1,6 @@
 var q = require('q'),
-app = require('flatiron').app,
-postal = require('postal');
+    app = require('flatiron').app,
+    postal = require('postal');
 
 /**
  * Iterate through an array of postal envelopes & publish
