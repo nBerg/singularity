@@ -146,7 +146,7 @@ function pullFromComment(comment, auth_user) {
       }
     );
 
-    return this.getPull({
+    return this._getPull({
       user: comment.repository.owner.login,
       repo: comment.repository.name,
       number: comment.issue.number
@@ -161,6 +161,60 @@ function pullFromComment(comment, auth_user) {
 module.exports = require('../plugin').extend({
   name: 'github',
 
+  /**
+   * @param {Object} payload Raw github PR payload object
+   * @return {Promise} Github status object for the fork SHA
+   */
+  _getShaStatus: function(payload) {
+    var query = {
+      user: payload.base.user.login,
+      repo: payload.base.repo.name,
+      sha: payload.head.sha
+    };
+    return q.ninvoke(this._api.statuses, 'get', query)
+    .then(function(statuses) {
+      if (statuses && statuses[0]) {
+        return statuses[0];
+      }
+      throw 'no statuses found for ' + JSON.stringify(query);
+    });
+  },
+
+  /**
+   * Util function to wrap API calls to get PR data
+   * also makes other functions a bit easier to test
+   * Forces the user to create a query object because the params
+   * may be vastly different, depending on the type of payload
+   *
+   * @param {Object} query containing `user`, `repo`, `number`
+   * @return {Promise} that resolves with a Github PR payload
+   */
+  _getPull: function(query) {
+    var reqPromise = q.defer();
+
+    q.ninvoke(this._api.pullRequests, 'get', query)
+    .done(function(pull) {
+      if (!pull) {
+        reqPromise.reject(
+          'could not get PR for issue_comment; ' +
+          JSON.stringify(prQuery)
+        );
+        return;
+      }
+      reqPromise.resolve(pull);
+    },
+    function(reason) {
+      reqPromise.reject(reason);
+    });
+
+    return reqPromise.promise;
+  },
+
+  /**
+   * Called via plugin / nbd/Class
+   *
+   * @param {Object} option
+   */
   init: function(option) {
     this._super(option);
     this._api = new GitHubApi({
@@ -197,32 +251,29 @@ module.exports = require('../plugin').extend({
    * Gets the latest status of a given PR github event
    *
    * @param {Object} payload Raw github event
-   * @return {Object} status object
+   * @return {Promise} resolves with the payload after validation
    */
   ensureNewPull: function(payload) {
-    var query = {
-      user: payload.base.user.login,
-      repo: payload.base.repo.name,
-      sha: payload.head.sha
-    };
-    return q.ninvoke(this._api.statuses, 'get', query)
-    .then(function(statuses) {
-      if (statuses && statuses[0]) {
-        return statuses[0];
-      }
-      throw 'no statuses found for ' + JSON.stringify(query);
-    })
+    if (this.config.ignore_statuses) {
+      return q(payload);
+    }
+    return this._getShaStatus(payload)
     .then(function(latestStatus) {
       if (~shaStatuses.indexOf(latestStatus.state)) {
         throw 'status already created for ' +
           payload.base.repo.full_name + ' #' + payload.number;
       }
     })
-    // not sure why .thenResolve does not work here...
-    .then(function() { return payload; });
+    .thenResolve(payload);
   },
 
-  generateVcsPayload: function (payload, auth_user) {
+  /**
+   * Required for Singularity VCS adapter API
+   *
+   * @param {Object} payload raw github event
+   * @return {Promise} resolves with an internal VCS payload
+   */
+  generateVcsPayload: function (payload) {
     var event = payload.__headers['x-github-event'],
     auth_user = this.config.auth.username;
 
@@ -243,50 +294,6 @@ module.exports = require('../plugin').extend({
     }
 
     throw 'invalid payload ' + JSON.stringify(payload).substring(0, 64) + '...';
-  },
-
-  start: function() {
-    if (this.config.method === 'hooks') {
-      this.debug('using hooks, performing startup PR scan.');
-      this.pollRepos();
-      return;
-    }
-    var self = this,
-    frequency = self.config.frequency || 4000;
-    async.parallel({
-      github: function() {
-        var run_github = function() {
-          self.pollRepos();
-          setTimeout(run_github, frequency);
-        };
-        run_github();
-      }
-    });
-  },
-
-  /**
-   * Util function to wrap API calls to get PR data
-   * also makes other functions a bit easier to test
-   */
-  getPull: function(query) {
-    var reqPromise = q.defer();
-
-    q.ninvoke(this._api.pullRequests, 'get', query)
-    .done(function(pull) {
-      if (!pull) {
-        reqPromise.reject(
-          'could not get PR for issue_comment; ' +
-          JSON.stringify(prQuery)
-        );
-        return;
-      }
-      reqPromise.resolve(pull);
-    },
-    function(reason) {
-      reqPromise.reject(reason);
-    });
-
-    return reqPromise.promise;
   },
 
   /**
@@ -315,7 +322,7 @@ module.exports = require('../plugin').extend({
         .map(function getPRDetails(pull) {
           // Currently the GitHub API doesn't provide the same information for
           // polling as it does when requesting a single, specific, pull request
-          return this.getPull({
+          return this._getPull({
             user: repo_owner,
             repo: repo_name,
             number: pull.number
@@ -324,7 +331,7 @@ module.exports = require('../plugin').extend({
             return pull;
           });
         }, this))
-        .then(function(promiseSnapshots) {
+        .then(function fulfilledRequests(promiseSnapshots) {
           return promiseSnapshots.filter(function(snapshot) {
             return snapshot.state === 'fulfilled';
           })
@@ -333,11 +340,13 @@ module.exports = require('../plugin').extend({
           });
         })
       }.bind(this))
-      .then(function(repoPulls) {
+      .then(function composePrList(repoPulls) {
         pullList = pullList.concat(repoPulls);
       });
     }, this))
-    .then(function() {
+    // have all values of promises that got PR details
+    // (composed in pullList)
+    .then(function buildVcsPayloads() {
       return q.all(
         pullList.map(function(pull) {
           return q(pull)
@@ -346,6 +355,7 @@ module.exports = require('../plugin').extend({
           .catch(this.error);
         }.bind(this))
       )
+      // filter out any undefined vals
       .then(function(allPayloads) {
         return allPayloads.filter(function(payload) {
           return !!payload;
