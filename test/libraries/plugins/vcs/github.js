@@ -39,16 +39,6 @@ describe('plugins/vcs/github', function() {
     });
   });
 
-  describe('#start', function() {
-    it('polls just once when method is hooks', function() {
-      var pollReposSpy = sinonSandbox.spy();
-      sinonSandbox.stub(instance, 'pollRepos', pollReposSpy);
-      instance.start();
-      expect(logDebugSpy).to.be.calledOnce;
-      expect(pollReposSpy).to.be.calledOnce;
-    });
-  });
-
   describe('#validatePayload', function() {
     it('throws error when no headers given', function() {
       expect(function() {
@@ -166,7 +156,7 @@ describe('plugins/vcs/github', function() {
       });
 
       it('can process issue_comment payloads', function() {
-        apiStub = sinonSandbox.stub(instance, 'getPull');
+        apiStub = sinonSandbox.stub(instance, '_getPull');
         apiStub.returns(q(testPr));
         testComment = require('./test_comment')();
         testComment.comment.body = '@' + pluginConfig.auth.username + ' retest';
