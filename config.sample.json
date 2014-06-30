@@ -1,0 +1,22 @@
+{
+  "log": {
+      "console": {
+          "level": "debug",
+          "colorize": true
+      }
+  },
+  "vcs": {
+      "github": {
+          "ignore_statuses": true,
+          "auth": {
+              "username": "CI_USER_GITHUB_NAME",
+              "token": "OAUTH_TOKEN_FOR_CI_USER",
+              "type": "oauth"
+          },
+          "repos": [
+              "awsome_org_one/repo_one",
+              "awsome_org_two/repo_two"
+          ]
+      }
+  }
+}
