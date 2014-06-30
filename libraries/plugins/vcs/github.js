@@ -210,6 +210,11 @@ module.exports = require('../plugin').extend({
     return reqPromise.promise;
   },
 
+  /**
+   * Called via plugin / nbd/Class
+   *
+   * @param {Object} option
+   */
   init: function(option) {
     this._super(option);
     this._api = new GitHubApi({
@@ -246,21 +251,20 @@ module.exports = require('../plugin').extend({
    * Gets the latest status of a given PR github event
    *
    * @param {Object} payload Raw github event
-   * @return {Object} status object
+   * @return {Promise} resolves with the payload after validation
    */
   ensureNewPull: function(payload) {
     if (this.config.ignore_statuses) {
       return q(payload);
     }
-    this._getShaStatus(payload)
+    return this._getShaStatus(payload)
     .then(function(latestStatus) {
       if (~shaStatuses.indexOf(latestStatus.state)) {
         throw 'status already created for ' +
           payload.base.repo.full_name + ' #' + payload.number;
       }
     })
-    // not sure why .thenResolve does not work here...
-    .then(function() { return payload; });
+    .thenResolve(payload);
   },
 
   /**

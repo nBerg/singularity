@@ -3,25 +3,23 @@ q = require('q'),
 chai = require('chai'),
 expect = chai.expect,
 sinon = require('sinon');
-
-// dependencies & test lib configuration
 chai.use(require('sinon-chai'));
 chai.use(require('chai-as-promised'));
-var pluginConfig = {
-  method: 'hooks',
-  host: 'foo',
-  port: 'bar',
-  auth: {
-    token: 'my_token',
-    type: 'oauth',
-    username: 'my_ci_user'
-  }
-};
 
 describe('plugins/vcs/github', function() {
-  var instance, logDebugSpy, sinonSandbox;
+  var instance, logDebugSpy, sinonSandbox, pluginConfig;
 
   beforeEach(function(done) {
+    pluginConfig = {
+      host: 'foo',
+      port: 'bar',
+      ignore_statuses: false,
+      auth: {
+        token: 'my_token',
+        type: 'oauth',
+        username: 'my_ci_user'
+      }
+    };
     instance = new Plugin(pluginConfig);
     sinonSandbox = sinon.sandbox.create();
     logDebugSpy = sinonSandbox.spy(instance.log, 'debug');
@@ -61,6 +59,50 @@ describe('plugins/vcs/github', function() {
         });
       })
       .to.throw(/unrecognized event/);
+    });
+  });
+
+  describe('#ensureNewPull', function() {
+    var testPr, statusStub;
+
+    beforeEach(function(done) {
+      testPr = require('./test_pr')();
+      done();
+    });
+
+    it('respects the ignore_statuses config', function() {
+      pluginConfig.ignore_statuses = true;
+      instance = new Plugin(pluginConfig);
+      statusStub = sinonSandbox.stub(instance, '_getShaStatus');
+      return expect(instance.ensureNewPull(testPr))
+      .to.eventually.be.fulfilled
+      .then(function(payload) {
+        expect(payload).to.deep.equal(testPr);
+        expect(statusStub).to.not.have.been.called;
+      });
+    });
+
+    it('rejects the PR if it has a known status', function() {
+      statusStub = sinon.stub(instance, '_getShaStatus');
+      statusStub.returns(q({ state: 'pending' }));
+      return expect(instance.ensureNewPull(testPr))
+      .to.eventually.be
+      .rejectedWith(/status already created for/)
+      .then(function() {
+        expect(statusStub).to.be.calledOnce;
+      });
+    });
+
+    it('accepts the PR if it has an empty status', function() {
+      statusStub = sinon.stub(instance, '_getShaStatus');
+      statusStub.returns(q({ state: null }));
+      return expect(instance.ensureNewPull(testPr))
+      .to.eventually.be
+      .fulfilled
+      .then(function(payload) {
+        expect(payload).to.deep.equal(testPr);
+        expect(statusStub).to.be.calledOnce;
+      });
     });
   });
 
