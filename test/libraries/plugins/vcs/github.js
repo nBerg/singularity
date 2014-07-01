@@ -1,8 +1,9 @@
 var Plugin = require('../../../../libraries/plugins/vcs/github'),
-q = require('q'),
-chai = require('chai'),
-expect = chai.expect,
-sinon = require('sinon');
+    q = require('q'),
+    chai = require('chai'),
+    expect = chai.expect,
+    sinon = require('sinon');
+
 chai.use(require('sinon-chai'));
 chai.use(require('chai-as-promised'));
 
