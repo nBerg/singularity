@@ -80,17 +80,6 @@ module.exports = require('../vent').extend({
   channel: undefined,
   objectType: 'adapter',
 
-  publish: function(topic, data) {
-    if (!this.channel) {
-      this.error(
-        'cannot publish topic, no channel',
-        {channel: this.name, topic: topic}
-      );
-      return;
-    }
-    this.channel.publish(topic, data);
-  },
-
   setChannel: function(channelName) {
     this.channel = postal.channel(channelName);
   },
@@ -108,7 +97,7 @@ module.exports = require('../vent').extend({
     this._super(option);
     this.plugins = [];
     this.executeInPlugins = this.executeInPlugins.bind(this);
-    this.publish = this.publish.bind(this);
+    this.publishPayload = this.publishPayload.bind(this);
     this.setChannel = this.setChannel.bind(this);
     this.setChannel(this.name);
     // do I know what I'm doing? obviously not.
@@ -116,6 +105,18 @@ module.exports = require('../vent').extend({
     this.bound_fx.forEach(function(fx) {
       this[fx] = this[fx].bind(this);
     }, this);
+  },
+
+  publishPayload: function(payload) {
+    if (!payload) {
+      this.error('no payload given...?!');
+      return;
+    }
+    if (!payload.type) {
+      this.error('payload has no type!', payload);
+      return;
+    }
+    this.channel.publish(payload.type, payload);
   },
 
   /**
