@@ -87,14 +87,20 @@ describe('Payload', function() {
   });
 
   describe('#validate', function() {
-    it('throws when a field is missing', function() {
+    it('throws explicitly when missing payload type', function() {
       instance = new TestPayload();
+      expect(function() { instance.validate(); })
+        .to.throw(/missing payload type!/);
+    });
+
+    it('throws when a field is missing', function() {
+      instance = new TestPayload({type: 'test_payload'});
       expect(function() { instance.validate(); })
         .to.throw(/missing field/);
     });
 
     it('throws when field val not in allowed vals', function() {
-      instance = new TestPayload({required: 'bar'});
+      instance = new TestPayload({type: 'test_payload', required: 'bar'});
       expect(function() { instance.validate(); })
         .to.throw(/value for.*not in.*/);
     });
