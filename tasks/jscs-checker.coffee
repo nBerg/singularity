@@ -7,9 +7,8 @@ module.exports = (grunt) =>
 
   grunt.config.set('jscs',
     main: [
-      'plugins/*.js',
-      'libraries/*.js',
-      'listeners/*.js',
+      'flatiron_plugins/*.js',
+      'libraries/**/*.js',
       'routes/*.js',
       'test/**/*.js'
     ]

@@ -29,7 +29,6 @@ module.exports = require('./adapter').extend({
    * processes, such as polling
    */
   start: function() {
-    var self = this;
     this.executeInPlugins(poll)
     .then(function(validPluginResults) {
       validPluginResults.forEach(function(pluginResults) {

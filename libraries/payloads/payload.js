@@ -1,7 +1,5 @@
 "use strict";
 
-var Payload;
-
 function validationError(message) {
   throw '[payload.validate] ' + message;
 }

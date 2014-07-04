@@ -1,6 +1,10 @@
 "use strict";
 
-var q = require('q');
+var q = require('q'),
+    validateChange,
+    validateProposal,
+    buildChange,
+    buildProposal;
 
 function buildChangePayload(vcsPayload) {
   return q(vcsPayload)

@@ -70,8 +70,8 @@ function pathFromName(plugin) {
  * @param {String} path Path of plugin to load
  */
 function loadFromPath(plugin, path) {
-  var klass = require(path),
-  instance = new klass(this.config.get(plugin));
+  var Klass = require(path),
+  instance = new Klass(this.config.get(plugin));
   instance.log = this.log;
   this.plugins.push(instance);
 }
@@ -128,13 +128,11 @@ module.exports = require('../vent').extend({
    */
   attachConfigPlugins: function(cfg) {
     var self = this,
-    plugins,
-    cfg = cfg || this.config.get();
+    plugins;
 
+    cfg = cfg || this.config.get();
     if (cfg.plugin) {
-      plugins = Array.isArray(cfg.plugin)
-                ? cfg.plugin
-                : [cfg.plugin];
+      plugins = Array.isArray(cfg.plugin) ? cfg.plugin : [cfg.plugin];
     }
     else {
       plugins = Object.keys(cfg).filter(function(key) {
