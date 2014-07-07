@@ -1,7 +1,7 @@
 "use strict";
 
 var q = require('q'),
-VcsPayload = require('../payloads/vcs').VcsPayload;
+    VcsPayload = require('../payloads/vcs').VcsPayload;
 
 function validateVcsPayload(vcsPayload) {
   new VcsPayload(vcsPayload).validate();
