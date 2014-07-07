@@ -1,10 +1,24 @@
 var GitHubApi = require('github'),
-    async = require('async'),
     q = require('q'),
     allowed_events = ['issue_comment', 'pull_request', 'push'],
     allowed_pr_actions = ['synchronize', 'opened'],
-    shaStatuses = ['pending', 'success', 'error', 'failure'],
-    VcsPayload = require('../../payloads/vcs').VcsPayload;
+    shaStatuses = ['pending', 'success', 'error', 'failure'];
+
+/**
+ * Given a PR, returns a string that represents its state that is recognized by
+ * the rest of the system (via the VCS payload)
+ *
+ * @param {Object} pull Raw github event
+ * @return {String} state
+ */
+function statusOfPull(pull) {
+  // During testing there were cases where the mergeable flag was null when using
+  // webhooks. We only want to return 'merged' when explicitly set to true
+  if (pull.merged) {
+    return 'merged';
+  }
+  return pull.state;
+}
 
 /**
  * Generates a VCS Payload from a push
@@ -59,22 +73,6 @@ function payloadFromPull(pull) {
 }
 
 /**
- * Given a PR, returns a string that represents its state that is recognized by
- * the rest of the system (via the VCS payload)
- *
- * @param {Object} pull Raw github event
- * @return {String} state
- */
-function statusOfPull(pull) {
-  // During testing there were cases where the mergeable flag was null when using
-  // webhooks. We only want to return 'merged' when explicitly set to true
-  if (pull.merged) {
-    return 'merged';
-  }
-  return pull.state;
-}
-
-/**
  * Checks & validates pull object, whether it should be ignored
  */
 function validateAndStandardizePull(pull, auth_user) {
@@ -89,7 +87,7 @@ function validateAndStandardizePull(pull, auth_user) {
     pull = pull.pull_request;
   }
 
-  var pr_name = pull.base.repo.full_name + ' #' + pull.number;
+  pr_name = pull.base.repo.full_name + ' #' + pull.number;
 
   if (pull.mergeable === false) {
     throw 'PR cannot be merged, ignoring ' + pr_name;
@@ -197,7 +195,7 @@ module.exports = require('../plugin').extend({
       if (!pull) {
         reqPromise.reject(
           'could not get PR for issue_comment; ' +
-          JSON.stringify(prQuery)
+          JSON.stringify(query)
         );
         return;
       }
@@ -273,7 +271,7 @@ module.exports = require('../plugin').extend({
    * @param {Object} payload raw github event
    * @return {Promise} resolves with an internal VCS payload
    */
-  generateVcsPayload: function (payload) {
+  generateVcsPayload: function(payload) {
     var event = payload.__headers['x-github-event'],
     auth_user = this.config.auth.username;
 
@@ -338,7 +336,7 @@ module.exports = require('../plugin').extend({
           .map(function(snapshot) {
             return snapshot.value;
           });
-        })
+        });
       }.bind(this))
       .then(function composePrList(repoPulls) {
         pullList = pullList.concat(repoPulls);

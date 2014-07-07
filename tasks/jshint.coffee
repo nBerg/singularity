@@ -9,9 +9,8 @@ module.exports = (grunt) =>
     options:
       jshintrc: true
     files: [
-      'plugins/*.js',
-      'libraries/*.js',
-      'listeners/*.js',
+      'flatiron_plugins/*.js',
+      'libraries/**/*.js',
       'routes/*.js',
       'test/**/*.js'
     ]

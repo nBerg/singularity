@@ -1,7 +1,5 @@
 "use strict";
 
-var Payload;
-
 function validationError(message) {
   throw '[payload.validate] ' + message;
 }
@@ -56,6 +54,9 @@ module.exports = require('nbd/Class').extend({
   },
 
   validate: function() {
+    if (!this.data.hasOwnProperty('type')) {
+      validationError('missing payload type!');
+    }
     this.required_fields.forEach(function(field) {
       if (!this.data.hasOwnProperty(field)) {
         validationError('missing field ' + field);

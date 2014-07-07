@@ -48,5 +48,9 @@ module.exports = require('nbd/Class').extend({
 
   error: function() {
     this.log.error.apply(this.log, this.formatLogs(arguments));
+  },
+
+  logForObject: function(obj) {
+    return JSON.stringify(obj).substring(0, 64) + '...';
   }
 });

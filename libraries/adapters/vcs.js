@@ -1,7 +1,7 @@
 "use strict";
 
 var q = require('q'),
-VcsPayload = require('../payloads/vcs').VcsPayload;
+    VcsPayload = require('../payloads/vcs').VcsPayload;
 
 function validateVcsPayload(vcsPayload) {
   new VcsPayload(vcsPayload).validate();
@@ -29,16 +29,15 @@ module.exports = require('./adapter').extend({
    * processes, such as polling
    */
   start: function() {
-    var self = this;
     this.executeInPlugins(poll)
     .then(function(validPluginResults) {
       validPluginResults.forEach(function(pluginResults) {
         pluginResults.forEach(function(payload) {
           this.debug(
-            '[polling_payload]',
-            JSON.stringify(payload).substring(0, 64) + '...'
+            'publishing payload from polling',
+            this.logForObject(payload)
           );
-          this.publish(payload.type, payload);
+          this.publishPayload(payload);
         }, this);
       }, this);
     }.bind(this))
@@ -47,13 +46,13 @@ module.exports = require('./adapter').extend({
 
   handleRequest: function(payload) {
     this.debug(
-      '[payload_received]',
-      JSON.stringify(payload).substring(0, 64) + '...'
+      'http request payload received',
+      this.logForObject(payload)
     );
     this.executeInPlugins(processPayload, payload)
     .then(function(payloads) {
       payloads.forEach(function(payload) {
-        this.publish(payload.type, payload);
+        this.publishPayload(payload);
       }, this);
     }.bind(this));
   }

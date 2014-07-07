@@ -1,7 +1,5 @@
 "use strict";
 
-var q = require('q');
-
 module.exports = require('./adapter').extend({
   name: 'publisher',
   pluginType: 'publishers',
@@ -28,7 +26,6 @@ module.exports = require('./adapter').extend({
         shouldn't ever get here cuz validated, but throw some sort of error
 
       res = plugin.createStatus(payload)
-
 
       if (res == success)
         // Does this need to return some payload?

@@ -87,7 +87,6 @@ module.exports = require('nbd/Class').extend({
     }, callback);
   };
 
-
   MongoDB.prototype.findPullByRepoId = function(pull_number, pull_repo_id, callback) {
     pull_number = parseInt(pull_number);
     pull_repo_id = parseInt(pull_repo_id);

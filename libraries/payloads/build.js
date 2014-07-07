@@ -5,13 +5,13 @@ module.exports.BuildPayload = require('./payload').extend({
 
   // TODO: flesh this out, this is just what the publisher needs
   required_fields: [
-      'repo',
+      'artifacts',
+      'build_id',
+      'link',
       'owner',
+      'repo',
       'sha',
-      'status',
-
-      // link, id?
-      'buildLink'
+      'status'
   ],
   field_vals: {
     status: ['queued', 'building', 'success', 'failure', 'error']
