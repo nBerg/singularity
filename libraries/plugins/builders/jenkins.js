@@ -53,33 +53,13 @@ function validateVcsParams(vcsPayload, required) {
 
   return q.allSettled(
     required.map(function(param) {
-      if (!vcsPayload) {
+      if (!vcsPayload[param]) {
         throw 'given VCS payload missing "' + param + '"';
       }
       return vcsPayload[param];
     }, this)
   )
   .thenResolve(vcsPayload);
-}
-
-/**
- * Ensure that a given change VCS payload has required non-falsey fields
- * @param {Object} vcsPayload
- * @return {Promise} resolves with vcsPayload if valid
- */
-function validateChangeVcs(vcsPayload) {
-  return q([vcsPayload, reqChangeVcsParams])
-  .spread(validateVcsParams);
-}
-
-/**
- * Ensure that a given proposal VCS payload has required non-falsey fields
- * @param {Object} vcsPayload
- * @return {Promise} resolves with vcsPayload if valid
- */
-function validateProposalVcs(vcsPayload) {
-  return q([vcsPayload, reqProposalVcsParams])
-  .spread(validateVcsParams);
 }
 
 /**
@@ -117,22 +97,37 @@ module.exports = require('../plugin').extend({
    */
   init: function(option) {
     this._super(option);
+    this._buildForVcs = this._buildForVcs.bind(this);
   },
 
   validateChange: function(vcsPayload) {
-    return q(vcsPayload)
-    .then(validateChangeVcs);
+    return q([vcsPayload, reqChangeVcsParams])
+    .spread(validateVcsParams);
   },
 
   validateProposal: function(vcsPayload) {
-    return q(vcsPayload)
-    .then(validateProposalVcs);
+    return q([vcsPayload, reqProposalVcsParams])
+    .spread(validateVcsParams);
   },
 
   buildChange: function(vcsPayload) {
+    return this._buildForVcs(vcsPayload);
   },
 
   buildProposal: function(vcsPayload) {
+    return this._buildForVcs(vcsPayload);
+  },
+
+  _buildProject: function(project, vcsPayload) {
+    var buildPayload;
+    return q(vcsPayload)
+    .then(buildPayloadFromVcs)
+    .then(function(payload) {
+      buildPayload = payload;
+      return [project, createJobParams(payload)];
+    })
+    .spread(triggerBuild)
+    .thenResolve(buildPayload);
   },
 
   _buildForVcs: function(vcsPayload) {
@@ -142,15 +137,7 @@ module.exports = require('../plugin').extend({
     .all(function(projects) {
       return q.all(
         projects.map(function(project) {
-          var buildPayload;
-          return q(vcsPayload)
-          .then(buildPayloadFromVcs)
-          .then(function(payload) {
-            buildPayload = payload;
-            return [project, createJobParams(payload)];
-          })
-          .spread(triggerBuild)
-          .thenResolve(buildPayload);
+          return this._buildProject(project, vcsPayload);
         }, this)
       );
     }.bind(this))
