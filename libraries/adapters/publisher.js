@@ -65,7 +65,7 @@ module.exports = require('./adapter').extend({
 
     this.debug('creating status for', this.logForObject(payload));
 
-    q(payload)
+    var chain = q(payload)
     .then(validateBuildPayload)
     .then(setStatusMessage)
     .then(function(buildPayload) {
@@ -75,8 +75,13 @@ module.exports = require('./adapter').extend({
       publisherPayloads.forEach(function(payload) {
         this.publishPayload(payload);
       }, this);
-    }.bind(this))
-    .done();
+    }.bind(this));
+
+    // TODO does done() even need to be called here?
+    // chain.done();
+
+    // Because hard to test once its done()
+    return chain;
   },
 
   start: function() {
