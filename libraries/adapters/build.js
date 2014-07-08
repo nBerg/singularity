@@ -4,11 +4,7 @@ var q = require('q'),
     VcsPayload = require('../payloads/vcs').VcsPayload,
     BuildPayload = require('../payloads/build').BuildPayload,
     validateBuildPayload,
-    validateVcsPayload,
-    validateChange,
-    validateProposal,
-    buildChange,
-    buildProposal;
+    validateVcsPayload;
 
 /**
  * @param {Object} buildPayload
@@ -37,9 +33,8 @@ function validateVcsPayload(vcsPayload) {
 function buildChangePayload(vcsPayload) {
   return q(vcsPayload)
   .then(validateVcsPayload)
-  .then(validateChange.bind(this))
-  .thenResolve(vcsPayload)
-  .then(buildChange.bind(this))
+  .then(this.validateChange.bind(this))
+  .then(this.buildChange.bind(this))
   .then(validateBuildPayload);
 }
 
@@ -54,9 +49,8 @@ function buildChangePayload(vcsPayload) {
 function buildProposalPayload(vcsPayload) {
   return q(vcsPayload)
   .then(validateVcsPayload)
-  .then(validateProposal.bind(this))
-  .thenResolve(vcsPayload)
-  .then(buildProposal.bind(this))
+  .then(this.validateProposal.bind(this))
+  .then(this.buildProposal.bind(this))
   .then(validateBuildPayload);
 }
 
