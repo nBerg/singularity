@@ -6,7 +6,7 @@ module.exports.BuildPayload = require('./payload').extend({
   // TODO: flesh this out, this is just what the publisher needs
   required_fields: [
       'artifacts',
-      'build_id',
+      'buildId',
       'link',
       'owner',
       'repo',
@@ -14,6 +14,7 @@ module.exports.BuildPayload = require('./payload').extend({
       'status'
   ],
   field_vals: {
+    //should this be the type?
     status: ['queued', 'building', 'success', 'failure', 'error']
   }
 });
