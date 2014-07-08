@@ -29,7 +29,7 @@ function validateVcsPayload(vcsPayload) {
 /**
  * MUST BIND `this`
  * Plugin workflow function to be bound to a plugin, returns a buildPayload
- * Triggers a build for a proposal, returns a build payload
+ * Triggers a build for a change, returns a build payload
  *
  * @param {Object} vcsPayload change payload (vcs payload)
  * @return {Promise} Resolves with a build payload

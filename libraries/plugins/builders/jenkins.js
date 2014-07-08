@@ -23,6 +23,13 @@ function buildPayloadFromVcs(vcsPayload) {
 function createJobParams(buildPayload) {
 }
 
+/**
+ * Generate headers for a build trigger based on a given plugin config
+ *
+ * @param {Object} config Jenkins plugin config
+ * @return {Object} headers used for request
+ * @todo Research other ways for auth
+ */
 function buildHeaders(config) {
   if (config.user && config.password) {
     return {
@@ -34,7 +41,16 @@ function buildHeaders(config) {
   return {};
 }
 
+/**
+ * Ensure that a given vcsPayload has the given required fields, PLUS
+ * the base-required fields
+ *
+ * @param {Object} vcsPayload
+ * @return {Promise} resolves with vcsPayload if valid
+ */
 function validateVcsParams(vcsPayload, required) {
+  required = reqBaseVcsParams.concat(required);
+
   return q.allSettled(
     required.map(function(param) {
       if (!vcsPayload) {
@@ -46,17 +62,23 @@ function validateVcsParams(vcsPayload, required) {
   .thenResolve(vcsPayload);
 }
 
+/**
+ * Ensure that a given change VCS payload has required non-falsey fields
+ * @param {Object} vcsPayload
+ * @return {Promise} resolves with vcsPayload if valid
+ */
 function validateChangeVcs(vcsPayload) {
-  return q([vcsPayload, reqBaseVcsParams])
-  .spread(validateVcsParams)
-  .thenResolve([vcsPayload, reqChangeVcsParams])
+  return q([vcsPayload, reqChangeVcsParams])
   .spread(validateVcsParams);
 }
 
+/**
+ * Ensure that a given proposal VCS payload has required non-falsey fields
+ * @param {Object} vcsPayload
+ * @return {Promise} resolves with vcsPayload if valid
+ */
 function validateProposalVcs(vcsPayload) {
-  return q([vcsPayload, reqBaseVcsParams])
-  .spread(validateVcsParams)
-  .thenResolve([vcsPayload, reqProposalVcsParams])
+  return q([vcsPayload, reqProposalVcsParams])
   .spread(validateVcsParams);
 }
 
@@ -82,8 +104,7 @@ function triggerBuild(config, job_name, url_options) {
 
   this.debug('jenkins build trigger', options);
 
-  return q(options)
-  .ninvoke(request, 'post', options);
+  return q.ninvoke(request, 'post', options);
 }
 
 module.exports = require('../plugin').extend({
