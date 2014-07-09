@@ -53,8 +53,7 @@ function setStatusMessage(buildPayload) {
 
 function publishStatus(buildPayload) {
   return q(buildPayload)
-  .then(this.createStatus.bind(this))
-  .then(validatePublisherPayload);
+  .then(this.createStatus.bind(this));
 }
 
 module.exports = require('./adapter').extend({
@@ -65,7 +64,7 @@ module.exports = require('./adapter').extend({
 
     this.debug('creating status for', this.logForObject(payload));
 
-    var chain = q(payload)
+    return q(payload)
     .then(validateBuildPayload)
     .then(setStatusMessage)
     .then(function(buildPayload) {
@@ -73,15 +72,10 @@ module.exports = require('./adapter').extend({
     }.bind(this))
     .then(function(publisherPayloads) {
       publisherPayloads.forEach(function(payload) {
+        validatePublisherPayload(payload);
         this.publishPayload(payload);
       }, this);
     }.bind(this));
-
-    // TODO does done() even need to be called here?
-    // chain.done();
-
-    // Because hard to test once its done()
-    return chain;
   },
 
   start: function() {

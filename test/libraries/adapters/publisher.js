@@ -63,18 +63,18 @@ describe('adapters/publisher', function() {
   });
 
   describe('#createStatus', function() {
-    describe('successfully creates', function() {
-      var buildPayload = {
-        status: '',
-        artifacts: '',
-        buildId: 302,
-        link: 'http://build-server/302',
-        owner: 'owner',
-        repo: 'test',
-        sha: '1234sdf',
-        type: ''
-      };
+    var buildPayload = {
+      status: '',
+      artifacts: '',
+      buildId: 302,
+      link: 'http://build-server/302',
+      owner: 'owner',
+      repo: 'test',
+      sha: '1234sdf',
+      type: ''
+    };
 
+    describe('successfully creates', function() {
       function publishedWithMessage(payload, message) {
         return publisher.createStatus(buildPayload)
         .then(function() {
@@ -127,8 +127,21 @@ describe('adapters/publisher', function() {
       });
 
     });
-  });
 
-  // TODO test build payloads that fail validation
-  // TODO test returned publisher payload that fail validation
+    describe('errors', function() {
+      it('when it receives a bad build payload', function(done) {
+        expect(publisher.createStatus({}))
+        .to.be.rejectedWith(/payload.validate/)
+        .notify(done);
+      });
+
+      it('when it receives a bad publisher payload from plugin', function(done) {
+        sinonSandbox.stub(pluginInstance, 'createStatus').returns({});
+
+        expect(publisher.createStatus(buildPayload))
+        .to.be.rejectedWith(/payload.validate/)
+        .notify(done);
+      });
+    });
+  });
 });
