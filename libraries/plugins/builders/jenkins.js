@@ -23,6 +23,13 @@ function buildPayloadFromVcs(vcsPayload) {
 function createJobParams(buildPayload) {
 }
 
+/**
+ * Generate headers for a build trigger based on a given plugin config
+ *
+ * @param {Object} config Jenkins plugin config
+ * @return {Object} headers used for request
+ * @todo Research other ways for auth
+ */
 function buildHeaders(config) {
   if (config.user && config.password) {
     return {
@@ -34,30 +41,25 @@ function buildHeaders(config) {
   return {};
 }
 
+/**
+ * Ensure that a given vcsPayload has the given required fields, PLUS
+ * the base-required fields
+ *
+ * @param {Object} vcsPayload
+ * @return {Promise} resolves with vcsPayload if valid
+ */
 function validateVcsParams(vcsPayload, required) {
+  required = reqBaseVcsParams.concat(required);
+
   return q.allSettled(
     required.map(function(param) {
-      if (!vcsPayload) {
+      if (!vcsPayload[param]) {
         throw 'given VCS payload missing "' + param + '"';
       }
       return vcsPayload[param];
     }, this)
   )
   .thenResolve(vcsPayload);
-}
-
-function validateChangeVcs(vcsPayload) {
-  return q([vcsPayload, reqBaseVcsParams])
-  .spread(validateVcsParams)
-  .thenResolve([vcsPayload, reqChangeVcsParams])
-  .spread(validateVcsParams);
-}
-
-function validateProposalVcs(vcsPayload) {
-  return q([vcsPayload, reqBaseVcsParams])
-  .spread(validateVcsParams)
-  .thenResolve([vcsPayload, reqProposalVcsParams])
-  .spread(validateVcsParams);
 }
 
 /**
@@ -82,8 +84,7 @@ function triggerBuild(config, job_name, url_options) {
 
   this.debug('jenkins build trigger', options);
 
-  return q(options)
-  .ninvoke(request, 'post', options);
+  return q.ninvoke(request, 'post', options);
 }
 
 module.exports = require('../plugin').extend({
@@ -96,22 +97,37 @@ module.exports = require('../plugin').extend({
    */
   init: function(option) {
     this._super(option);
+    this._buildForVcs = this._buildForVcs.bind(this);
   },
 
   validateChange: function(vcsPayload) {
-    return q(vcsPayload)
-    .then(validateChangeVcs);
+    return q([vcsPayload, reqChangeVcsParams])
+    .spread(validateVcsParams);
   },
 
   validateProposal: function(vcsPayload) {
-    return q(vcsPayload)
-    .then(validateProposalVcs);
+    return q([vcsPayload, reqProposalVcsParams])
+    .spread(validateVcsParams);
   },
 
   buildChange: function(vcsPayload) {
+    return this._buildForVcs(vcsPayload);
   },
 
   buildProposal: function(vcsPayload) {
+    return this._buildForVcs(vcsPayload);
+  },
+
+  _buildProject: function(project, vcsPayload) {
+    var buildPayload;
+    return q(vcsPayload)
+    .then(buildPayloadFromVcs)
+    .then(function(payload) {
+      buildPayload = payload;
+      return [project, createJobParams(payload)];
+    })
+    .spread(triggerBuild)
+    .thenResolve(buildPayload);
   },
 
   _buildForVcs: function(vcsPayload) {
@@ -121,15 +137,7 @@ module.exports = require('../plugin').extend({
     .all(function(projects) {
       return q.all(
         projects.map(function(project) {
-          var buildPayload;
-          return q(vcsPayload)
-          .then(buildPayloadFromVcs)
-          .then(function(payload) {
-            buildPayload = payload;
-            return [project, createJobParams(payload)];
-          })
-          .spread(triggerBuild)
-          .thenResolve(buildPayload);
+          return this._buildProject(project, vcsPayload);
         }, this)
       );
     }.bind(this))

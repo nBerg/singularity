@@ -1,3 +1,5 @@
+"use strict";
+
 var Plugin = require('../../../../libraries/plugins/vcs/github'),
     q = require('q'),
     chai = require('chai'),
