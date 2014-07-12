@@ -100,11 +100,6 @@ module.exports = require('../vent').extend({
     this.publishPayload = this.publishPayload.bind(this);
     this.setChannel = this.setChannel.bind(this);
     this.setChannel(this.name);
-    // do I know what I'm doing? obviously not.
-    this.bound_fx = this.bound_fx || [];
-    this.bound_fx.forEach(function(fx) {
-      this[fx] = this[fx].bind(this);
-    }, this);
   },
 
   publishPayload: function(payload) {

@@ -28,6 +28,11 @@ module.exports = require('nbd/Class').extend({
     this.info = this.info.bind(this);
     this.debug = this.debug.bind(this);
     this.error = this.error.bind(this);
+    // do I know what I'm doing? obviously not.
+    this.bound_fx = this.bound_fx || [];
+    this.bound_fx.forEach(function(fx) {
+      this[fx] = this[fx].bind(this);
+    }, this);
   },
 
   formatLogs: function(args) {
