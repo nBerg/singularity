@@ -12,7 +12,15 @@ describe('plugins/builders/jenkins', function() {
   var instance, config;
 
   beforeEach(function(done) {
-    config = {};
+    config = {
+        auth: {
+            project_token: 'global_project_token'
+        },
+        projects: {
+            test_repo_string: 'string_repo',
+            test_repo_obj: {}
+        }
+    };
     instance = new Plugin(config);
     done();
   });
@@ -93,6 +101,24 @@ describe('plugins/builders/jenkins', function() {
       expect(instance.validateProposal(vcsPayload))
       .to.eventually.deep.eql(vcsPayload)
       .notify(done);
+    });
+  });
+
+  describe('#_buildForVcs', function() {
+    it('rejects when config has no projects', function() {
+    instance = new Plugin({});
+      return expect(instance._buildForVcs({}))
+        .to.eventually.be.rejectedWith('no projects given in config');
+    });
+
+    it('rejects when repo config DNE', function() {
+      return expect(instance._buildForVcs({repo: 'dne_repo'}))
+        .to.eventually.be.rejectedWith(/associated with any projects/);
+    });
+
+    it('rejects when repo object config has no matching type', function() {
+      return expect(instance._buildForVcs({repo: 'test_repo_obj', type: 'foo'}))
+        .to.eventually.be.rejectedWith(/no foo/);
     });
   });
 });

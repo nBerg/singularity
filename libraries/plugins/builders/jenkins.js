@@ -11,10 +11,54 @@ var request = require('request'),
     buildPayloadFromVcs,
     createJobParams;
 
-function getRepoProjects(repo, job_type, config) {
+function getProjectFromObject(obj) {
+  if (typeof obj === 'string') {
+    return obj;
+  }
+  return obj.project;
 }
 
-function buildPayloadFromVcs(vcsPayload) {
+function getRepoProjects(repo, type, config) {
+  var masterToken = (config.auth) ? config.auth.project_token : null;
+
+  config = config.projects;
+  if (!config) {
+    throw 'no projects given in config';
+  }
+  if (!config[repo]) {
+    throw 'repo ' + repo + ' not associated with any projects';
+  }
+
+  var repoProjectToken = config[repo].project_token || null;
+
+  if (typeof config[repo] === 'string') {
+    return [
+        {
+            project: config[repo],
+            project_token: repoProjectToken || masterToken
+        }
+    ];
+  }
+
+  if (!config[repo][type]) {
+    throw 'no ' + type + ' project(s) associated with ' + repo;
+  }
+
+  // conform to array - allow singular objects
+  // also, reference modification, what can go wrong?
+  if (!Array.isArray(config[repo][type])) {
+    config[repo][type] = [config[repo][type]];
+  }
+
+  return config[repo][type].map(function(obj) {
+    return {
+        project: getProjectFromObject(obj),
+        project_token: obj.project_token || repoProjectToken || masterToken
+    };
+  });
+}
+
+function buildPayloadFromVcs(project, vcsPayload) {
   return {
     JOB: uuid.v1()
   };
@@ -51,12 +95,15 @@ function buildHeaders(config) {
 function validateVcsParams(vcsPayload, required) {
   required = reqBaseVcsParams.concat(required);
 
-  return q.allSettled(
+  return q.all(
     required.map(function(param) {
-      if (!vcsPayload[param]) {
-        throw 'given VCS payload missing "' + param + '"';
-      }
-      return vcsPayload[param];
+      return q(param)
+      .then(function() {
+        if (!vcsPayload[param]) {
+          throw 'given VCS payload missing "' + param + '"';
+        }
+        return vcsPayload[param];
+      });
     }, this)
   )
   .thenResolve(vcsPayload);
@@ -65,18 +112,19 @@ function validateVcsParams(vcsPayload, required) {
 /**
  * GET to the Jenkins API to start a build
  *
- * @method triggerBuild
- * @param config {Object} Configuration for plugin
- * @param job_name {String}
- * @param url_options {Options}
+ * @function triggerBuild
+ * @param project {Object} internally built project object based on config
+ * @param buildPayload {Object} internally build payload
+ * @param config {Object} plugin config
+ * @return {Promise} ninvoke on mikael/request (POST to /job/name_name/buildWithParameters)
  */
-function triggerBuild(config, job_name, url_options) {
+function triggerBuild(project, buildPayload, config) {
   var options = {
     url: url.format({
       protocol: config.protocol,
       host: config.host,
-      pathname: '/job/' + job_name + '/buildWithParameters',
-      query: url_options
+      pathname: '/job/' + project.project + '/buildWithParameters',
+      query: buildPayload
     }),
     method: 'POST',
     headers: buildHeaders(config)
@@ -101,13 +149,11 @@ module.exports = require('../plugin').extend({
   },
 
   validateChange: function(vcsPayload) {
-    return q([vcsPayload, reqChangeVcsParams])
-    .spread(validateVcsParams);
+    return validateVcsParams(vcsPayload, reqChangeVcsParams);
   },
 
   validateProposal: function(vcsPayload) {
-    return q([vcsPayload, reqProposalVcsParams])
-    .spread(validateVcsParams);
+    return validateVcsParams(vcsPayload, reqProposalVcsParams);
   },
 
   buildChange: function(vcsPayload) {
@@ -120,19 +166,19 @@ module.exports = require('../plugin').extend({
 
   _buildProject: function(project, vcsPayload) {
     var buildPayload;
-    return q(vcsPayload)
+    return q([project, vcsPayload])
     .then(buildPayloadFromVcs)
     .then(function(payload) {
       buildPayload = payload;
+      buildPayload.project = project.project;
       return [project, createJobParams(payload)];
     })
-    .spread(triggerBuild)
+    .spread(triggerBuild.bind(this))
     .thenResolve(buildPayload);
   },
 
   _buildForVcs: function(vcsPayload) {
-    return q(vcsPayload)
-    .thenResolve([vcsPayload.repo, vcsPayload.type, this.config])
+    return q([vcsPayload.repo, vcsPayload.type, this.config])
     .spread(getRepoProjects)
     .all(function(projects) {
       return q.all(
