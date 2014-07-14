@@ -71,14 +71,24 @@ module.exports = require('./adapter').extend({
       return this.executeInPlugins(publishStatus, payload);
     }.bind(this))
     .then(function(publisherPayloads) {
-      publisherPayloads.forEach(function(payload) {
-        validatePublisherPayload(payload);
-        this.publishPayload(payload);
-      }, this);
-    }.bind(this));
-  },
+      var promises = [];
 
-  start: function() {
-    //nothing here
+      publisherPayloads.forEach(function(payload) {
+        promises.push(q(payload)
+        .then(validatePublisherPayload)
+        .thenResolve(payload)
+        .then(this.publishPayload.bind(this)));
+      }, this);
+
+      return promises;
+    }.bind(this))
+    .allSettled()
+    .then(function(results) {
+      results.forEach(function(result) {
+        if (result.state !== "fulfilled") {
+          throw result.reason;
+        }
+      });
+    });
   }
 });
