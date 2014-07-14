@@ -152,10 +152,10 @@ module.exports = require('../vent').extend({
     .done(
       function(res) {
         if (self.start) {
-          self.info('starting...');
+          self.debug('starting...');
           return self.start();
         }
-        self.error('no start method');
+        self.debug('no start method');
       }
     );
   },

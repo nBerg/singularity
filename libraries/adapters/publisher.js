@@ -76,9 +76,5 @@ module.exports = require('./adapter').extend({
         this.publishPayload(payload);
       }, this);
     }.bind(this));
-  },
-
-  start: function() {
-    //nothing here
   }
 });
