@@ -146,6 +146,7 @@ module.exports = require('../plugin').extend({
   init: function(option) {
     this._super(option);
     this._buildForVcs = this._buildForVcs.bind(this);
+    this._buildForVcs = this._buildForVcs.bind(this);
   },
 
   validateChange: function(vcsPayload) {
@@ -180,7 +181,7 @@ module.exports = require('../plugin').extend({
   _buildForVcs: function(vcsPayload) {
     return q([vcsPayload.repo, vcsPayload.type, this.config])
     .spread(getRepoProjects)
-    .all(function(projects) {
+    .then(function(projects) {
       return q.all(
         projects.map(function(project) {
           return this._buildProject(project, vcsPayload);
