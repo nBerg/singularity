@@ -2,21 +2,26 @@
 
 var q = require('q');
 
-function addRepoToConfig(payload) {
+// function addRepoToConfig(payload) {
+//   return q(payload)
+//   // THIS:
+//   .then(addRepoToConfig)
+//
+//   // OR THIS: (roughly)
+//   .then(function(payload) {
+//     this.addRepo(payload.org, payload.repoName);
+//
+//     // Per type of builder???
+//     this.addRepoProposalJobs(payload.repo, payload.proposalJobs); //jobs is an array
+//     this.addRepoChangeJobs(payload.repo, payload.changeJobs);
+//
+//     // Add type of publisher???
+//   }.bind(this));
+// }
+
+function addProposalToRepo(payload) {
   return q(payload)
-  // THIS:
-  .then(addRepoToConfig)
-
-  // OR THIS: (roughly)
-  .then(function(payload) {
-    this.addRepo(payload.org, payload.repoName);
-
-    // Per type of builder???
-    this.addRepoProposalJobs(payload.repo, payload.proposalJobs); //jobs is an array
-    this.addRepoChangeJobs(payload.repo, payload.changeJobs);
-
-    // Add type of publisher???
-  }.bind(this));
+  .then(addProposalToRepo);
 }
 
 module.exports = require('./adapter').extend({
@@ -28,21 +33,40 @@ module.exports = require('./adapter').extend({
     // call plugin.start()
   },
 
-  // What sort of payload would this receive?
-  addRepoToConfig: function(payload) {
-    q(payload)
-    .then(validatePayload)
+  // // What sort of payload would this receive?
+  // addRepoToConfig: function(payload) {
+  //   q(payload)
+  //   .then(validatePayload)
+  //   .then(function(payload) {
+  //     return this.executeInPlugins(addRepoToConfig, payload);
+  //   }.bind(this))
+  //   .then(function(dbPayloads) {
+  //     dbPayloads.forEach(function(payload) {
+  //       // Will this be a db payload? db config payload?? dunno
+  //       validateDbPayload(payload);
+  //       this.publishPayload(payload);
+  //     }, this);
+  //   }.bind(this));
+  // },
+
+  addProposalToRepo: function(vcsPayload) {
+    return q(vcsPayload)
+    .then(validateVcsPayload)
     .then(function(payload) {
-      return this.executeInPlugins(addRepoToConfig, payload);
+      return this.executeInPlugins(addProposalToRepo, payload);
     }.bind(this))
     .then(function(dbPayloads) {
       dbPayloads.forEach(function(payload) {
-        // Will this be a db payload? db config payload?? dunno
         validateDbPayload(payload);
         this.publishPayload(payload);
       }, this);
     }.bind(this));
-  }
+  },
+
+  // should this be the same as add proposal??
+  addChangeToRepo: function(payload) {
+
+  },
 });
 
 // "use strict";
