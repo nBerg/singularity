@@ -1,39 +1,94 @@
 "use strict";
 
+var q = require('q'),
+    BuildPayload = require('../payloads/build').BuildPayload,
+    PublisherPayload = require('../payloads/publisher').PublisherPayload;
+
+/**
+ * @param {Object} buildPayload
+ */
+function validateBuildPayload(buildPayload) {
+  new BuildPayload(buildPayload).validate();
+  return buildPayload;
+}
+
+/**
+ * @param {Object} publisherPayload
+ */
+function validatePublisherPayload(publisherPayload) {
+  new PublisherPayload(publisherPayload).validate();
+  return publisherPayload;
+}
+
+/**
+ * Set the message to publish based on the
+ * status of the payload
+ *
+ * @param {Object} buildPayload
+ */
+function setStatusMessage(buildPayload) {
+  switch (buildPayload.status) {
+  case 'queued':
+      buildPayload.message = 'job has been added to queue';
+      break;
+    case 'building':
+      buildPayload.message = 'currently running';
+      break;
+    case 'success':
+      buildPayload.message = 'successfully built';
+      break;
+    case 'failure':
+      buildPayload.message = 'failed to build';
+      break;
+    case 'error':
+      buildPayload.message = 'There was an error trying to test this pr';
+      break;
+    default:
+      // TODO: throw error
+      break;
+  }
+
+  return q(buildPayload);
+}
+
+function publishStatus(buildPayload) {
+  return q(buildPayload)
+  .then(this.createStatus.bind(this));
+}
+
 module.exports = require('./adapter').extend({
   name: 'publisher',
   pluginType: 'publishers',
-  bound_fx: ['createStatus'],
 
   createStatus: function(payload) {
-    this.log.debug('creating status - not implemented');
 
-    /*
-      validatePayload(payload)?
+    this.debug('creating status for', this.logForObject(payload));
 
-      switch status
-      case queued:
-        paylod.message = 'job has been added to queue'
-      case building:
-        payload.message = 'currently running'
-      case success:
-        payload.message = 'successfully built'
-      case failure:
-        payload.message = 'failed to build'
-      case error:
-        payload.message = 'There was an error trying to test this pr'
-      default:
-        shouldn't ever get here cuz validated, but throw some sort of error
+    return q(payload)
+    .then(validateBuildPayload)
+    .then(setStatusMessage)
+    .then(function(buildPayload) {
+      return this.executeInPlugins(publishStatus, payload);
+    }.bind(this))
+    .then(function(publisherPayloads) {
+      var promises = [];
 
-      res = plugin.createStatus(payload)
+      publisherPayloads.forEach(function(payload) {
+        promises.push(q(payload)
+        .then(validatePublisherPayload)
+        .thenResolve(payload)
+        .then(this.publishPayload.bind(this)));
+      }, this);
 
-      if (res == success)
-        // Does this need to return some payload?
-        validatePublisherPayload(res)
-        publish('published.success')
-      else
-        validatePublisherPayload(res)
-        publish('published.error')
-     */
+      return promises;
+    }.bind(this))
+    .allSettled()
+    .then(function(results) {
+      results.forEach(function(result) {
+        if (result.state !== "fulfilled") {
+          throw result.reason;
+        }
+      });
+    });
   }
 });
