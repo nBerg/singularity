@@ -22,11 +22,11 @@ function validateHasPlugins() {
  * @param {String} plugin Name of the plugin
  * @return {Object} Config for plugin
  */
-function validatePluginCfg(plugin) {
-  if (!this.config.get(plugin)) {
-    throw 'No config for ' + this.name + '.' + plugin;
+function validatePluginCfg(adapter, plugin, config) {
+  if (!config[plugin]) {
+    throw 'No config for ' + adapter + '.' + plugin;
   }
-  return this.config.get(plugin);
+  return config[plugin];
 }
 
 /**
@@ -93,8 +93,7 @@ module.exports = require('../vent').extend({
     if (!this.pluginType) {
       throw 'No pluginType defined';
     }
-    option = require('nconf').defaults(option);
-    this._super(option);
+    this._super(require('nconf').defaults(option));
     this.plugins = [];
     this.executeInPlugins = this.executeInPlugins.bind(this);
     this.publishPayload = this.publishPayload.bind(this);
@@ -119,13 +118,13 @@ module.exports = require('../vent').extend({
    * If a `plugin` field exists, this fx will exclusively attempt
    * to load that plugin
    *
-   * @param {undefined | Object} cfg Defaults to this.config.get()
+   * @param {undefined | Object} customCfgs Defaults to this.config.get()
    */
-  attachConfigPlugins: function(cfg) {
+  attachConfigPlugins: function(customCfgs) {
     var self = this,
-    plugins;
+        plugins,
+        cfg = customCfgs || this.config.get();
 
-    cfg = cfg || this.config.get();
     if (cfg.plugin) {
       plugins = Array.isArray(cfg.plugin) ? cfg.plugin : [cfg.plugin];
     }
@@ -160,8 +159,8 @@ module.exports = require('../vent').extend({
    * @return {Promise}
    */
   attachPlugin: function(plugin) {
-    return q(plugin)
-    .then(validatePluginCfg.bind(this))
+    return q([this.name, plugin, this.config.get()])
+    .spread(validatePluginCfg)
     .thenResolve(plugin)
     .then(pathFromName.bind(this))
     .then(function(path) {
