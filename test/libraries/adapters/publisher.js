@@ -71,6 +71,7 @@ describe('adapters/publisher', function() {
       owner: 'owner',
       repo: 'test',
       sha: '1234sdf',
+      project: 'some-project',
       type: ''
     };
 

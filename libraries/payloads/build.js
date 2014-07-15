@@ -8,9 +8,8 @@ module.exports.BuildPayload = require('./payload').extend({
       'artifacts',
       'buildId',
       'link',
-      'owner',
+      'project',
       'repo',
-      'sha',
       'status'
   ],
   field_vals: {
