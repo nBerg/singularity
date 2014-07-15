@@ -18,7 +18,8 @@
     "q": "^1.0.1",
     "range_check": "0.0.4",
     "request": ">=2.9.203",
-    "winston": ">=0.6.2"
+    "winston": ">=0.6.2",
+    "stack-trace": "~0.0.9"
   },
   "devDependencies": {
     "chai": "~1.9",

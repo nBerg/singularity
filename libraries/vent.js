@@ -1,6 +1,7 @@
 "use strict";
 
 var winston = require('winston'),
+    stackTrace = require('stack-trace'),
     logger = new winston.Logger({
       transports: [
         new (winston.transports.Console)()
@@ -53,6 +54,11 @@ module.exports = require('nbd/Class').extend({
 
   error: function() {
     this.log.error.apply(this.log, this.formatLogs(arguments));
+    var trace = stackTrace.get();
+    console.log('\t========= StackTrace ========');
+    for (var i = 0; i < trace.length; ++i) {
+      console.log('\t' + trace[i].getFileName() + ':' + trace[i].getLineNumber());
+    }
   },
 
   logForObject: function(obj) {

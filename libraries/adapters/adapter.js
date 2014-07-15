@@ -104,11 +104,11 @@ module.exports = require('../vent').extend({
 
   publishPayload: function(payload) {
     if (!payload) {
-      this.error('no payload given...?!');
+      this.debug('no payload given, ignoring');
       return;
     }
     if (!payload.type) {
-      this.error('payload has no type!', payload);
+      this.debug('payload has no type!', payload);
       return;
     }
     this.channel.publish(payload.type, payload);

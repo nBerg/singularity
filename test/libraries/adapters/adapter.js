@@ -13,12 +13,13 @@ var TestAdapter = Adapter.extend({
 });
 
 describe('Adapter', function() {
-  var instance, sinonSandbox, errorStub;
+  var instance, sinonSandbox, errorStub, debugStub;
 
   beforeEach(function(done) {
     sinonSandbox = sinon.sandbox.create();
     instance = new TestAdapter();
     errorStub = sinonSandbox.stub(instance, 'error');
+    debugStub = sinonSandbox.stub(instance, 'debug');
     done();
   });
 
@@ -30,14 +31,14 @@ describe('Adapter', function() {
   describe('#publishPayload', function() {
     it('errors when undefined payload given', function() {
       instance.publishPayload();
-      expect(errorStub).to.have.been.calledOnce;
-      expect(errorStub).to.have.been.calledWithMatch(/no payload given/);
+      expect(debugStub).to.have.been.calledOnce;
+      expect(debugStub).to.have.been.calledWithMatch(/no payload given/);
     });
 
     it('errors when payload has no type', function() {
       instance.publishPayload({});
-      expect(errorStub).to.have.been.calledOnce;
-      expect(errorStub).to.have.been.calledWithMatch(/payload has no type/);
+      expect(debugStub).to.have.been.calledOnce;
+      expect(debugStub).to.have.been.calledWithMatch(/payload has no type/);
     });
 
     it('publishes!', function() {
