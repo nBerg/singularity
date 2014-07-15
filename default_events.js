@@ -5,6 +5,7 @@
 module.exports = [
     // PAYLOAD EVENTS
     {channel: 'hook', topic: 'payload', adapter: 'vcs', callback: 'handleRequest'},
+    {channel: 'build', topic: 'update', adapter: 'build', callback: 'handleBuildUpdate'},
 
     // reactions to VCS payloads
     {channel: 'vcs', topic: 'change', adapter: 'build', callback: 'buildChange'},

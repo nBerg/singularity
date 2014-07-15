@@ -78,6 +78,13 @@ function executeAndPublish(workflow, payload) {
   }.bind(this));
 }
 
+function buildUpdate(httpPayload) {
+  return q(httpPayload)
+  .then(this.validateBuildUpdate.bind(this))
+  .then(this.createUpdatePayload.bind(this))
+  .then(validateBuildPayload);
+}
+
 /**
  * @module adapters/build
  */
@@ -91,5 +98,9 @@ module.exports = require('./adapter').extend({
 
   buildProposal: function(proposalPayload) {
     executeAndPublish.call(this, buildProposalPayload, proposalPayload);
+  },
+
+  handleBuildUpdate: function(httpPayload) {
+    executeAndPublish.call(this, buildUpdate, httpPayload);
   }
 });

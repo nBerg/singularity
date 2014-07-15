@@ -15,6 +15,7 @@ app.start(app.config.get('port'), function() {
   singularity.mapTriggers(require('./default_events'));
 
   singularity.route({
+    '/build/update': require('./routes/build/update'),
     '/hook': require('./routes/hook'),
     '/config': require('./routes/cfg'),
     '/pull_requests': require('./routes/pull_requests'),
