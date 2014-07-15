@@ -5,7 +5,9 @@ require('replay');
 var Plugin = require('../../../../libraries/plugins/builders/jenkins'),
     chai = require('chai'),
     expect = chai.expect,
-    sinon = require('sinon');
+    sinon = require('sinon'),
+    q = require('q'),
+    uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
 
 chai.use(require('chai-as-promised'));
 chai.use(require('sinon-chai'));
@@ -136,6 +138,30 @@ describe('plugins/builders/jenkins', function() {
       expect(instance.validateProposal(vcsPayload))
       .to.eventually.deep.eql(vcsPayload)
       .notify(done);
+    });
+  });
+
+  describe('#_buildProject', function() {
+    it('resolves with a build payload', function() {
+      var triggerStub = sinonSandbox.stub(
+            instance,
+            '_triggerBuild',
+            function() { return q(''); }
+          ),
+          project = {project: 'foobar', token: 'token'},
+          payload = {repo: 'foo/bar'};
+      return expect(instance._buildProject(project, payload))
+      .to.eventually.be.fulfilled
+      .then(function(res) {
+        expect(res.artifacts).to.deep.eql({});
+        expect(res.buildId).to.match(uuidRegex);
+        expect(res.link).to.eql('');
+        expect(res.project).to.eql('foobar');
+        expect(res.repo).to.eql('foo/bar');
+        expect(res.status).to.eql('queued');
+        expect(res.type).to.eql('jenkins');
+        expect(triggerStub).to.have.been.calledOnce;
+      });
     });
   });
 
