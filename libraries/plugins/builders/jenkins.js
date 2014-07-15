@@ -60,11 +60,34 @@ function getRepoProjects(repo, type, config) {
 
 function buildPayloadFromVcs(project, vcsPayload) {
   return {
-    JOB: uuid.v1()
+      artifacts: {},
+      buildId: uuid.v1(),
+      link: '',
+      project: project.project,
+      repo: vcsPayload.repo,
+      status: 'queued',
+      type: 'jenkins'
   };
 }
 
-function createJobParams(buildPayload) {
+// TODO: update this when the vcsPayload schema has been corrected to use camelcase
+function createJobParams(buildPayload, project, vcsPayload) {
+  var params = {
+      buildId: buildPayload.buildId,
+      cause: vcsPayload.repo + ' - ' + vcsPayload.change,
+      baseUrl: vcsPayload.repo_url,
+      baseBranch: vcsPayload.base_ref,
+      forkUrl: vcsPayload.fork_url || '',
+      forkRef: vcsPayload.fork_ref || '',
+      before: vcsPayload.before || '',
+      after: vcsPayload.after || ''
+  };
+
+  if (project.project_token) {
+    params.token = project.project_token;
+  }
+
+  return params;
 }
 
 /**
@@ -109,45 +132,9 @@ function validateVcsParams(vcsPayload, required) {
   .thenResolve(vcsPayload);
 }
 
-/**
- * GET to the Jenkins API to start a build
- *
- * @function triggerBuild
- * @param project {Object} internally built project object based on config
- * @param buildPayload {Object} internally build payload
- * @param config {Object} plugin config
- * @return {Promise} ninvoke on mikael/request (POST to /job/name_name/buildWithParameters)
- */
-function triggerBuild(project, buildPayload, config) {
-  var options = {
-    url: url.format({
-      protocol: config.protocol,
-      host: config.host,
-      pathname: '/job/' + project.project + '/buildWithParameters',
-      query: buildPayload
-    }),
-    method: 'POST',
-    headers: buildHeaders(config)
-  };
-
-  this.debug('jenkins build trigger', options);
-
-  return q.ninvoke(request, 'post', options);
-}
-
 module.exports = require('../plugin').extend({
   name: 'jenkins',
-
-  /**
-   * Called via plugin / nbd/Class
-   *
-   * @param {Object} option
-   */
-  init: function(option) {
-    this._super(option);
-    this._buildForVcs = this._buildForVcs.bind(this);
-    this._buildForVcs = this._buildForVcs.bind(this);
-  },
+  bound_fx: ['_buildForVcs', '_buildProject', '_triggerBuild'],
 
   validateChange: function(vcsPayload) {
     return validateVcsParams(vcsPayload, reqChangeVcsParams);
@@ -165,19 +152,63 @@ module.exports = require('../plugin').extend({
     return this._buildForVcs(vcsPayload);
   },
 
-  _buildProject: function(project, vcsPayload) {
-    var buildPayload;
-    return q([project, vcsPayload])
-    .then(buildPayloadFromVcs)
-    .then(function(payload) {
-      buildPayload = payload;
-      buildPayload.project = project.project;
-      return [project, createJobParams(payload)];
-    })
-    .spread(triggerBuild.bind(this))
-    .thenResolve(buildPayload);
+  /**
+   * POST to the Jenkins API to start a build
+   *
+   * @function triggerBuild
+   * @param project {Object} internally built project object based on config
+   * @param params {Object} internally built params from createJobParams
+   * @return {Promise} ninvoke on mikael/request
+   *                   (POST to /job/name_name/buildWithParameters)
+   */
+  _triggerBuild: function(project, params) {
+    var options = {
+      url: url.format({
+        protocol: this.config.protocol,
+        host: this.config.host,
+        pathname: '/job/' + project.project + '/buildWithParameters',
+        query: params
+      }),
+      method: 'POST',
+      headers: buildHeaders(this.config)
+    };
+
+    this.debug('jenkins build trigger', options);
+
+    // TODO: error throwing
+    return q.ninvoke(request, 'post', options);
   },
 
+  /**
+   * @param project {Object} internally built project object based on config
+   * @param vcsPayload {Object} payloads/vcs
+   * @return {Promise} Resolves with build payload, queued status only
+   */
+  _buildProject: function(project, vcsPayload) {
+    var publishPayload;
+
+    return q([project, vcsPayload])
+    .spread(buildPayloadFromVcs)
+    .then(function(buildPayload) {
+      publishPayload = buildPayload;
+      return [buildPayload, project, vcsPayload];
+    })
+    .spread(createJobParams)
+    .then(function(params) {
+      return [project, params];
+    })
+    .spread(this._triggerBuild)
+    // TODO: error throwing
+    .then(function() {
+      return publishPayload;
+    });
+  },
+
+  /**
+   * @param vcsPayload {Object} payloads/vcs
+   * @return {Promise} Maps out projects to trigger for this plugin instance
+   *                   calls _buildProject to trigger them
+   */
   _buildForVcs: function(vcsPayload) {
     return q([vcsPayload.repo, vcsPayload.type, this.config])
     .spread(getRepoProjects)
@@ -193,27 +224,6 @@ module.exports = require('../plugin').extend({
         return !!pl;
       });
     });
-    // original PR params
-    //{
-    //  token: trigger_token,
-    //  cause: 'Testing PR: ' + number,
-    //  REPOSITORY_URL: ssh_url,
-    //  BRANCH_NAME: branch,
-    //  JOB: job_id,
-    //  PULL: number,
-    //  BASE_BRANCH_NAME: pull.base.ref,
-    //  SHA: sha
-    //};
-
-    // original Push params
-    //{
-    //  token: project.token || self.config.token,
-    //  cause: push.ref + ' updated to ' + push.after,
-    //  BRANCH_NAME: branch,
-    //  BEFORE: push.before,
-    //  AFTER: push.after,
-    //  JOB: job_id
-    //}
   }
 });
 
