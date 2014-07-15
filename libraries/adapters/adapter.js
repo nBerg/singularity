@@ -52,9 +52,10 @@ function internalPluginPath(type, name) {
  * @throws String when neither cfg path or internal path exists
  */
 function pathFromName(plugin) {
-  var cfgPath = this.config.get('plugin_path'),
-  filePath = internalPluginPath(this.pluginType, plugin);
-  cfgPath = fs.existsSync(cfgPath) ? cfgPath : false;
+  var cfgPath = this.config.plugin_path,
+      filePath = internalPluginPath(this.pluginType, plugin);
+      cfgPath = cfgPath && fs.existsSync(cfgPath) ? cfgPath : false;
+
   if (!cfgPath && !fs.existsSync(filePath)) {
     throw 'plugin_path cfg not defined (or does not exist) & ' +
       filePath +
@@ -69,9 +70,9 @@ function pathFromName(plugin) {
  *
  * @param {String} path Path of plugin to load
  */
-function loadFromPath(plugin, path) {
+function loadFromPath(plugin, path, config) {
   var Klass = require(path),
-  instance = new Klass(this.config.get(plugin));
+  instance = new Klass(config);
   instance.log = this.log;
   this.plugins.push(instance);
 }
@@ -93,7 +94,7 @@ module.exports = require('../vent').extend({
     if (!this.pluginType) {
       throw 'No pluginType defined';
     }
-    this._super(require('nconf').defaults(option));
+    this._super(option);
     this.plugins = [];
     this.executeInPlugins = this.executeInPlugins.bind(this);
     this.publishPayload = this.publishPayload.bind(this);
@@ -118,12 +119,12 @@ module.exports = require('../vent').extend({
    * If a `plugin` field exists, this fx will exclusively attempt
    * to load that plugin
    *
-   * @param {undefined | Object} customCfgs Defaults to this.config.get()
+   * @param {undefined | Object} customCfgs Defaults to this.config
    */
   attachConfigPlugins: function(customCfgs) {
     var self = this,
         plugins,
-        cfg = customCfgs || this.config.get();
+        cfg = customCfgs || this.config;
 
     if (cfg.plugin) {
       plugins = Array.isArray(cfg.plugin) ? cfg.plugin : [cfg.plugin];
@@ -159,13 +160,12 @@ module.exports = require('../vent').extend({
    * @return {Promise}
    */
   attachPlugin: function(plugin) {
-    return q([this.name, plugin, this.config.get()])
+    var pluginCfg = this.config[plugin];
+    return q([this.name, plugin, this.config])
     .spread(validatePluginCfg)
     .thenResolve(plugin)
     .then(pathFromName.bind(this))
-    .then(function(path) {
-      return [plugin, path];
-    })
+    .then(function(path) { return [plugin, path, pluginCfg]; })
     .spread(loadFromPath.bind(this))
     .catch(this.error);
   },
@@ -187,6 +187,10 @@ module.exports = require('../vent').extend({
         .catch(plugin.error);
       })
     )
-    .then(q.all);
+    .then(q.all)
+    .catch(function(err) {
+      this.error(err);
+      return [];
+    }.bind(this));
   }
 });
