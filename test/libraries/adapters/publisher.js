@@ -71,6 +71,7 @@ describe('adapters/publisher', function() {
       owner: 'owner',
       repo: 'test',
       sha: '1234sdf',
+      host: 'build-host',
       project: 'some-project',
       type: '',
       triggeringPayload: {},

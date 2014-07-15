@@ -8,6 +8,7 @@ module.exports.BuildPayload = require('./payload').extend({
       'cause',
       'artifacts',
       'buildId',
+      'host',
       'link',
       'project',
       'repo',

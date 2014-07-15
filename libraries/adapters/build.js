@@ -65,7 +65,7 @@ function buildProposalPayload(vcsPayload) {
  */
 function executeAndPublish(workflow, payload) {
   this.debug(
-    'request for build received',
+    'request for build adapter received',
      this.logForObject(payload)
   );
   return this.executeInPlugins(workflow, payload)

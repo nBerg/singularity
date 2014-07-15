@@ -58,12 +58,13 @@ function getRepoProjects(repo, type, config) {
   });
 }
 
-function buildPayloadFromVcs(project, vcsPayload) {
+function buildPayloadFromVcs(project, vcsPayload, host) {
   return {
       artifacts: {},
       buildId: uuid.v1(),
       cause: 'vcsPayload',
       link: '',
+      host: host,
       project: project.project,
       repo: vcsPayload.repo,
       status: 'queued',
@@ -161,8 +162,11 @@ module.exports = require('../plugin').extend({
     if (!httpPayload.__headers.host) {
       throw 'no host header - ignoring';
     }
-    if (httpPayload.__headers.host !== this.config.host) {
-      throw 'build update not sent from tied jenkins instance, ignoring';
+    if (!httpPayload.build || !httpPayload.build.parameters) {
+      throw 'no parameters for build';
+    }
+    if (httpPayload.build.parameters.host !== this.config.host) {
+      throw 'unable to determine jenkins instance that sent this payload';
     }
     if (!httpPayload.build.url) {
       throw 'no build URL in http payload, ignoring';
@@ -176,6 +180,7 @@ module.exports = require('../plugin').extend({
         buildId: httpPayload.build.parameters.buildId,
         cause: httpPayload.build.parameters.cause,
         link: this.config.protocol + '://' + this.config.host + httpPayload.build.url,
+        host: httpPayload.build.parameters.host,
         project: httpPayload.name,
         repo: httpPayload.repo,
         status: this._determineBuildStatus(httpPayload),
@@ -229,7 +234,7 @@ module.exports = require('../plugin').extend({
   _buildProject: function(project, vcsPayload) {
     var publishPayload;
 
-    return q([project, vcsPayload])
+    return q([project, vcsPayload, this.config.host])
     .spread(buildPayloadFromVcs)
     .then(function(buildPayload) {
       publishPayload = buildPayload;
