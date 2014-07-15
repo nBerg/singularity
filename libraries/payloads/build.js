@@ -5,12 +5,14 @@ module.exports.BuildPayload = require('./payload').extend({
 
   // TODO: flesh this out, this is just what the publisher needs
   required_fields: [
+      'cause',
       'artifacts',
       'buildId',
       'link',
       'project',
       'repo',
-      'status'
+      'status',
+      'triggeringPayload'
   ],
   field_vals: {
     //should this be the type?

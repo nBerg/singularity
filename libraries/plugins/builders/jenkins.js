@@ -62,11 +62,13 @@ function buildPayloadFromVcs(project, vcsPayload) {
   return {
       artifacts: {},
       buildId: uuid.v1(),
+      cause: 'vcsPayload',
       link: '',
       project: project.project,
       repo: vcsPayload.repo,
       status: 'queued',
-      type: 'jenkins'
+      type: 'jenkins',
+      triggeringPayload: vcsPayload
   };
 }
 
@@ -74,7 +76,7 @@ function buildPayloadFromVcs(project, vcsPayload) {
 function createJobParams(buildPayload, project, vcsPayload) {
   var params = {
       buildId: buildPayload.buildId,
-      cause: vcsPayload.repo + ' - ' + vcsPayload.change,
+      cause: vcsPayload.change,
       baseUrl: vcsPayload.repo_url,
       baseBranch: vcsPayload.base_ref,
       forkUrl: vcsPayload.fork_url || '',
@@ -150,6 +152,46 @@ module.exports = require('../plugin').extend({
 
   buildProposal: function(vcsPayload) {
     return this._buildForVcs(vcsPayload);
+  },
+
+  validateBuildUpdate: function(httpPayload) {
+    if (!httpPayload.__headers) {
+      throw 'no __headers field; payload was not built internally';
+    }
+    if (!httpPayload.__headers.host) {
+      throw 'no host header - ignoring';
+    }
+    if (httpPayload.__headers.host !== this.config.host) {
+      throw 'build update not sent from tied jenkins instance, ignoring';
+    }
+    if (!httpPayload.build.url) {
+      throw 'no build URL in http payload, ignoring';
+    }
+    return httpPayload;
+  },
+
+  createUpdatePayload: function(httpPayload) {
+    return q({
+        artifacts: httpPayload.build.artifacts,
+        buildId: httpPayload.build.parameters.buildId,
+        cause: httpPayload.build.parameters.cause,
+        link: this.config.protocol + '://' + this.config.host + httpPayload.build.url,
+        project: httpPayload.name,
+        repo: httpPayload.repo,
+        status: this._determineBuildStatus(httpPayload),
+        type: 'jenkins',
+        triggeringPayload: httpPayload
+    });
+  },
+
+  _determineBuildStatus: function(httpPayload) {
+    if (httpPayload.build.phase === 'STARTED') {
+      return 'building';
+    }
+    if (httpPayload.build.phase === 'FINALIZED') {
+      return (httpPayload.build.phase === 'SUCCESS') ? 'success' : 'failure';
+    }
+    throw 'build has not been finalized yet ' + this.logForObject(httpPayload);
   },
 
   /**

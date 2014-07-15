@@ -72,7 +72,9 @@ describe('adapters/publisher', function() {
       repo: 'test',
       sha: '1234sdf',
       project: 'some-project',
-      type: ''
+      type: '',
+      triggeringPayload: {},
+      cause: 'somePR'
     };
 
     describe('successfully creates', function() {
