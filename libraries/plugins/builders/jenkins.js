@@ -7,6 +7,7 @@ var request = require('request'),
     reqBaseVcsParams = ['repo', 'after', 'change', 'actor'],
     reqChangeVcsParams = ['before'],
     reqProposalVcsParams = ['repo_url', 'base_ref', 'fork_ref', 'fork_url'],
+    validBuildCodes = [200, 201],
     getRepoProjects,
     buildPayloadFromVcs,
     createJobParams;
@@ -76,8 +77,11 @@ function buildPayloadFromVcs(project, vcsPayload, host) {
 // TODO: update this when the vcsPayload schema has been corrected to use camelcase
 function createJobParams(buildPayload, project, vcsPayload) {
   var params = {
-      buildId: buildPayload.buildId,
+      token: project.project_token || '',
       cause: vcsPayload.change,
+
+      buildId: buildPayload.buildId,
+      host: buildPayload.host,
       baseUrl: vcsPayload.repo_url,
       baseBranch: vcsPayload.base_ref,
       forkUrl: vcsPayload.fork_url || '',
@@ -85,10 +89,6 @@ function createJobParams(buildPayload, project, vcsPayload) {
       before: vcsPayload.before || '',
       after: vcsPayload.after || ''
   };
-
-  if (project.project_token) {
-    params.token = project.project_token;
-  }
 
   return params;
 }
@@ -101,14 +101,16 @@ function createJobParams(buildPayload, project, vcsPayload) {
  * @todo Research other ways for auth
  */
 function buildHeaders(config) {
-  if (config.user && config.password) {
+  var auth = config.auth || {};
+  if (auth.user && auth.password) {
+    console.log(auth.user + ":" + auth.pass);
     return {
       authorization: 'Basic ' +
-        (new Buffer(config.user + ":" + config.pass, 'ascii')
-        .toString('base64'))
+      (new Buffer(auth.user + ":" + auth.password, 'ascii')
+      .toString('base64'))
     };
   }
-  return {};
+  return false;
 }
 
 /**
@@ -155,12 +157,14 @@ module.exports = require('../plugin').extend({
     return this._buildForVcs(vcsPayload);
   },
 
+  /**
+   * @param httpPayload {Object} Internally build httpPayload, based on the
+   *                             the payload built by the notification-plugin
+   * @return {Object} httpPayload
+   */
   validateBuildUpdate: function(httpPayload) {
     if (!httpPayload.__headers) {
       throw 'no __headers field; payload was not built internally';
-    }
-    if (!httpPayload.__headers.host) {
-      throw 'no host header - ignoring';
     }
     if (!httpPayload.build || !httpPayload.build.parameters) {
       throw 'no parameters for build';
@@ -174,6 +178,11 @@ module.exports = require('../plugin').extend({
     return httpPayload;
   },
 
+  /**
+   * @param httpPayload {Object} Internally build httpPayload, based on the
+   *                             the payload built by the notification-plugin
+   * @return {Promise} Object that represents a complete buildPayload
+   */
   createUpdatePayload: function(httpPayload) {
     return q({
         artifacts: httpPayload.build.artifacts,
@@ -189,6 +198,13 @@ module.exports = require('../plugin').extend({
     });
   },
 
+  /**
+   * Reads an httpPayload from the notification-plugin
+   * Maps the status of the payload to an internally recognized status
+   *
+   * @param httpPayload {Object} internally built payload
+   * @return {String}
+   */
   _determineBuildStatus: function(httpPayload) {
     if (httpPayload.build.phase === 'STARTED') {
       return 'building';
@@ -209,21 +225,32 @@ module.exports = require('../plugin').extend({
    *                   (POST to /job/name_name/buildWithParameters)
    */
   _triggerBuild: function(project, params) {
-    var options = {
-      url: url.format({
-        protocol: this.config.protocol,
-        host: this.config.host,
-        pathname: '/job/' + project.project + '/buildWithParameters',
-        query: params
-      }),
-      method: 'POST',
-      headers: buildHeaders(this.config)
-    };
+    var headers = buildHeaders(this.config),
+        options = {
+          url: url.format({
+            protocol: this.config.protocol,
+            host: this.config.host,
+            pathname: '/job/' + project.project + '/buildWithParameters',
+            query: params
+          }),
+          method: 'GET'
+        };
 
-    this.debug('jenkins build trigger', options);
+    if (headers) { options.headers = headers; }
 
-    // TODO: error throwing
-    return q.ninvoke(request, 'post', options);
+    this.info('jenkins build trigger', project.project);
+    this.debug('trigger options', options);
+
+    return q.nfcall(request, options)
+    .spread(function(response, body) {
+      if (!response.statusCode ||
+          !~validBuildCodes.indexOf(response.statusCode)) {
+        this.debug(body);
+        throw '[' + response.statusCode +
+        '] failed to trigger build for ' +
+          this.logForObject(project);
+      }
+    }.bind(this));
   },
 
   /**
@@ -245,7 +272,6 @@ module.exports = require('../plugin').extend({
       return [project, params];
     })
     .spread(this._triggerBuild)
-    // TODO: error throwing
     .then(function() {
       return publishPayload;
     });
