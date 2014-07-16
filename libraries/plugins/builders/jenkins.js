@@ -216,8 +216,8 @@ module.exports = require('../plugin').extend({
         artifacts: httpPayload.build.artifacts,
         buildId: httpPayload.build.parameters.buildId,
         cause: httpPayload.build.parameters.cause,
-        link: this.config.protocol + '://' + this.config.host +
-              httpPayload.build.url + '/consoleFull',
+        link: this.config.protocol + '://' + this.config.host + '/' +
+              httpPayload.build.url + 'consoleFull',
         host: httpPayload.build.parameters.host,
         project: httpPayload.name,
         repo: httpPayload.repo,
