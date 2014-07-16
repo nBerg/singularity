@@ -132,7 +132,6 @@ function createJobParams(buildPayload, project, vcsPayload) {
 function buildHeaders(config) {
   var auth = config.auth || {};
   if (auth.user && auth.password) {
-    console.log(auth.user + ":" + auth.pass);
     return {
       authorization: 'Basic ' +
       (new Buffer(auth.user + ":" + auth.password, 'ascii')
