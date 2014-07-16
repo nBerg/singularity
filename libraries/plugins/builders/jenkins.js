@@ -12,6 +12,12 @@ var request = require('request'),
     buildPayloadFromVcs,
     createJobParams;
 
+/**
+ * Utility fx that takes a string or object & return name of an object
+ *
+ * @param {String|Object} obj
+ * @return {String}
+ */
 function getProjectFromObject(obj) {
   if (typeof obj === 'string') {
     return obj;
@@ -19,6 +25,17 @@ function getProjectFromObject(obj) {
   return obj.project;
 }
 
+/**
+ * Given a repo, type & config, goes through the projects in the config, looks
+ * for any projects associated with the given repo & returns an list of projects
+ * and the tokens required to trigger them
+ *
+ * @param {String} repo Name of the repo
+ * @param {String} type Type of change required
+ * @param {Object} config plugin config containing repo-project mappings
+ * @return {Array} Array of objects, each with two fields: project (name of
+ *                 project) & project_token (token to use to trigger the project)
+ */
 function getRepoProjects(repo, type, config) {
   var masterToken = (config.auth) ? config.auth.project_token : null;
 
@@ -59,6 +76,12 @@ function getRepoProjects(repo, type, config) {
   });
 }
 
+/**
+ * @param {Object} project internally build object from getRepoProjects()
+ * @param {Object} vcsPayload given vcsPayload from the event_mapper
+ * @param {String} host the jenkins instance that this plugin is tied to
+ * @return {Object} a buildPayload
+ */
 function buildPayloadFromVcs(project, vcsPayload, host) {
   return {
       artifacts: {},
@@ -74,7 +97,13 @@ function buildPayloadFromVcs(project, vcsPayload, host) {
   };
 }
 
-// TODO: update this when the vcsPayload schema has been corrected to use camelcase
+/**
+ * @param {Object} buildPayload A build payload
+ * @param {Object} project internally build object from getRepoProjects()
+ * @param {Object} vcsPayload given vcsPayload from the event_mapper
+ * @return {Object} Query params required to trigger a job
+ * @TODO: update when the vcsPayload schema has been corrected to use camelcase
+ */
 function createJobParams(buildPayload, project, vcsPayload) {
   var params = {
       token: project.project_token || '',
