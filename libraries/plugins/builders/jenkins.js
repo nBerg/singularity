@@ -92,7 +92,7 @@ function buildPayloadFromVcs(project, vcsPayload, host) {
       project: project.project,
       repo: vcsPayload.repo,
       status: 'queued',
-      type: 'jenkins',
+      type: 'queued',
       triggeringPayload: vcsPayload
   };
 }
@@ -222,7 +222,7 @@ module.exports = require('../plugin').extend({
         project: httpPayload.name,
         repo: httpPayload.repo,
         status: this._determineBuildStatus(httpPayload),
-        type: 'jenkins',
+        type: this._determineBuildStatus(httpPayload),
         triggeringPayload: httpPayload
     });
   },
