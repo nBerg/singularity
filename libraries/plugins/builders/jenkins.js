@@ -213,15 +213,15 @@ module.exports = require('../plugin').extend({
    */
   createUpdatePayload: function(httpPayload) {
     return q({
-        artifacts: httpPayload.build.artifacts,
         buildId: httpPayload.build.parameters.buildId,
+        repo: httpPayload.repo,
+        project: httpPayload.name,
         cause: httpPayload.build.parameters.cause,
+        status: this._determineBuildStatus(httpPayload),
         link: this.config.protocol + '://' + this.config.host + '/' +
               httpPayload.build.url + 'consoleFull',
         host: httpPayload.build.parameters.host,
-        project: httpPayload.name,
-        repo: httpPayload.repo,
-        status: this._determineBuildStatus(httpPayload),
+        artifacts: httpPayload.build.artifacts,
         type: this._determineBuildStatus(httpPayload),
         triggeringPayload: httpPayload
     });
@@ -239,7 +239,7 @@ module.exports = require('../plugin').extend({
       return 'building';
     }
     if (httpPayload.build.phase === 'FINALIZED') {
-      return (httpPayload.build.phase === 'SUCCESS') ? 'success' : 'failure';
+      return (httpPayload.build.status === 'SUCCESS') ? 'success' : 'failure';
     }
     throw 'build has not been finalized yet ' + this.logForObject(httpPayload);
   },
