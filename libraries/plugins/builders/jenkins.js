@@ -91,6 +91,7 @@ function buildPayloadFromVcs(project, vcsPayload, host) {
       host: host,
       project: project.project,
       repo: vcsPayload.repo,
+      revision: vcsPayload.after,
       status: 'queued',
       type: 'queued',
       triggeringPayload: vcsPayload
@@ -215,6 +216,7 @@ module.exports = require('../plugin').extend({
     return q({
         buildId: httpPayload.build.parameters.buildId,
         repo: httpPayload.repo,
+        revision: httpPayload.build.parameters.after,
         project: httpPayload.name,
         cause: httpPayload.build.parameters.cause,
         status: this._determineBuildStatus(httpPayload),
