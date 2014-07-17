@@ -87,10 +87,22 @@ function executeAndPublish(workflow, payload) {
   );
   return this.executeInPlugins(workflow, payload)
   .then(function(pluginResults) {
-    pluginResults.forEach(function(buildResults) {
+    pluginResults.filter(function(result) {
+      return !!result;
+    })
+    .forEach(function(buildResults) {
+      // VCS workflows can potentially trigger multiple build systems
+      // which is why they return arrays of buildPayloads
+      // buildStatus updates however, should only return a single response
+      // per build plugin (for the time being at least), which is why this
+      // check is here
+      if (!Array.isArray(buildResults)) {
+        buildResults = [buildResults];
+      }
+
       buildResults.forEach(function(buildPayload) {
         this.publishPayload(buildPayload);
-      });
+      }, this);
     }.bind(this));
   }.bind(this));
 }
