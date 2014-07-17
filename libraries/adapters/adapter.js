@@ -111,6 +111,7 @@ module.exports = require('../vent').extend({
       this.debug('payload has no type!', payload);
       return;
     }
+    this.debug('publishing', this.logForObject(payload));
     this.channel.publish(payload.type, payload);
   },
 
