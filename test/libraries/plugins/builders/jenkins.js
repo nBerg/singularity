@@ -17,6 +17,7 @@ describe('plugins/builders/jenkins', function() {
 
   beforeEach(function(done) {
     config = {
+        host: 'test_host',
         auth: {
             project_token: 'global_project_token'
         },
@@ -62,7 +63,7 @@ describe('plugins/builders/jenkins', function() {
     done();
   });
 
-  describe('#validateChangeVcs', function() {
+  describe('#validateChange', function() {
     var vcsPayload;
 
     beforeEach(function(done) {
@@ -91,7 +92,7 @@ describe('plugins/builders/jenkins', function() {
     });
   });
 
-  describe('#validateProposalVcs', function() {
+  describe('#validateProposal', function() {
     var vcsPayload;
 
     beforeEach(function(done) {
@@ -138,6 +139,75 @@ describe('plugins/builders/jenkins', function() {
       expect(instance.validateProposal(vcsPayload))
       .to.eventually.deep.eql(vcsPayload)
       .notify(done);
+    });
+  });
+
+  describe('#validateBuildUpdate', function() {
+    var httpPayload;
+
+    beforeEach(function(done) {
+      httpPayload = { __headers: {}, build: {} };
+      done();
+    });
+
+    it('throws when no __headers', function() {
+      httpPayload.__headers = false;
+      expect(function() { instance.validateBuildUpdate(httpPayload); })
+      .to.throw(/no __headers/);
+    });
+
+    it('throws when no build', function() {
+      httpPayload.build = false;
+      expect(function() { instance.validateBuildUpdate(httpPayload); })
+      .to.throw(/no parameters for build/);
+    });
+
+    it('throws when no build params', function() {
+      expect(function() { instance.validateBuildUpdate(httpPayload); })
+      .to.throw(/no parameters for build/);
+    });
+
+    it('throws when host does not match', function() {
+      httpPayload.build.parameters = { host: false };
+      expect(function() { instance.validateBuildUpdate(httpPayload); })
+      .to.throw(/unable to determine jenkins instance/);
+    });
+
+    it('throws when no build url', function() {
+      httpPayload.build.parameters = { host: 'test_host' };
+      expect(function() { instance.validateBuildUpdate(httpPayload); })
+      .to.throw(/no build URL/);
+    });
+  });
+
+  describe('#_determineBuildStatus', function() {
+    var httpPayload;
+
+    beforeEach(function(done) {
+      httpPayload = { build: {} };
+      done();
+    });
+
+    it('maps "STARTED" to "building"', function() {
+      httpPayload.build.phase = 'STARTED';
+      expect(instance._determineBuildStatus(httpPayload)).to.eql('building');
+    });
+
+    it('maps "FINIALIZED/SUCCESS" to "success"', function() {
+      httpPayload.build.phase = 'FINALIZED';
+      httpPayload.build.status = 'SUCCESS';
+      expect(instance._determineBuildStatus(httpPayload)).to.eql('success');
+    });
+
+    it('maps "FINIALIZED/anything" to "failure"', function() {
+      httpPayload.build.phase = 'FINALIZED';
+      httpPayload.build.status = 'blah';
+      expect(instance._determineBuildStatus(httpPayload)).to.eql('failure');
+    });
+
+    it('maps "ANYTHING" to "finishing"', function() {
+      httpPayload.build.phase = 'SOMETHING';
+      expect(instance._determineBuildStatus(httpPayload)).to.eql('finishing');
     });
   });
 
