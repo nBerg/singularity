@@ -124,17 +124,8 @@ module.exports = require('../vent').extend({
    */
   attachConfigPlugins: function(customCfgs) {
     var self = this,
-        plugins,
-        cfg = customCfgs || this.config;
-
-    if (cfg.plugin) {
-      plugins = Array.isArray(cfg.plugin) ? cfg.plugin : [cfg.plugin];
-    }
-    else {
-      plugins = Object.keys(cfg).filter(function(key) {
-        key !== 'plugin';
-      });
-    }
+        cfg = customCfgs || this.config,
+        plugins = this._getCfgPluginList(cfg);
 
     return q.allSettled(
       plugins.map(function(plugin) {
@@ -193,5 +184,20 @@ module.exports = require('../vent').extend({
       this.error(err);
       return [];
     }.bind(this));
+  },
+
+  /**
+   * @param {Object} cfg A cfg object with a 'plugin' property to read
+   * @return {Array} string names of plugins that this adapter *should*
+   *                 be able to recognize, assuming that everything was
+   *                 set up correctly
+   */
+  _getCfgPluginList: function(cfg) {
+    if (cfg.plugin) {
+      return Array.isArray(cfg.plugin) ? cfg.plugin : [cfg.plugin];
+    }
+    return Object.keys(cfg).filter(function(key) {
+      return key !== 'plugin';
+    });
   }
 });

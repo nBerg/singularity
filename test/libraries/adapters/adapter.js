@@ -17,7 +17,7 @@ describe('Adapter', function() {
 
   beforeEach(function(done) {
     sinonSandbox = sinon.sandbox.create();
-    instance = new TestAdapter();
+    instance = new TestAdapter({});
     errorStub = sinonSandbox.stub(instance, 'error');
     debugStub = sinonSandbox.stub(instance, 'debug');
     done();
@@ -46,8 +46,26 @@ describe('Adapter', function() {
           payload = { type: 'test_payload' };
       instance.publishPayload(payload);
       expect(errorStub).to.not.have.been.called;
+      expect(debugStub).to.have.been.called;
       expect(postalStub).to.have.been.calledOnce;
       expect(postalStub).to.have.been.calledWithExactly('test_payload', payload);
+    });
+  });
+
+  describe('#_getCfgPluginList', function() {
+    it('can take a single plugin name', function() {
+      expect(instance._getCfgPluginList({plugin: 'blah'}))
+      .to.eql(['blah']);
+    });
+
+    it('can take an array of plugin names', function() {
+      expect(instance._getCfgPluginList({plugin: ['foo', 'bar']}))
+      .to.eql(['foo', 'bar']);
+    });
+
+    it('attempts to pull out all plugin configs otherwise', function() {
+      expect(instance._getCfgPluginList({foo: {}, bar: {}}))
+      .to.eql(['foo', 'bar']);
     });
   });
 });
