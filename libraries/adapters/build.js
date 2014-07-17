@@ -8,6 +8,7 @@ var q = require('q'),
 
 /**
  * @param {Object} buildPayload
+ * @return {Object} buildPayload
  */
 function validateBuildPayload(buildPayload) {
   new BuildPayload(buildPayload).validate();
@@ -16,10 +17,26 @@ function validateBuildPayload(buildPayload) {
 
 /**
  * @param {Object} vcsPayload
+ * @return {Object} vcsPayload
  */
 function validateVcsPayload(vcsPayload) {
   new VcsPayload(vcsPayload).validate();
   return vcsPayload;
+}
+
+/**
+ * MUST BIND `this`
+ * Plugin workflow to handle httpPayloads coming from build systems
+ * signaling state changes for builds
+ *
+ * @param {Object} httpPayload
+ * @param {Promise}
+ */
+function buildUpdate(httpPayload) {
+  return q(httpPayload)
+  .then(this.validateBuildUpdate.bind(this))
+  .then(this.createUpdatePayload.bind(this))
+  .then(validateBuildPayload);
 }
 
 /**
@@ -57,7 +74,7 @@ function buildProposalPayload(vcsPayload) {
 /**
  * MUST BIND `this`
  * Executes a given build plugin workflow (function to be executed in context of
- * plugin) given a VCS Payload
+ * plugin) given a Payload
  *
  * @param {Function} workflow Function to execute in context of plugins
  * @param {Object} payload either a change or proposal payload (vcs payload)
@@ -76,13 +93,6 @@ function executeAndPublish(workflow, payload) {
       });
     }.bind(this));
   }.bind(this));
-}
-
-function buildUpdate(httpPayload) {
-  return q(httpPayload)
-  .then(this.validateBuildUpdate.bind(this))
-  .then(this.createUpdatePayload.bind(this))
-  .then(validateBuildPayload);
 }
 
 /**
