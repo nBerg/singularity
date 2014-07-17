@@ -2,11 +2,7 @@
 
 var GitHubApi = require('github'),
     q = require('q'),
-    PublisherPayload = require('../../payloads/publisher').PublisherPayload,
     pendingStats = ['queued', 'building'];
-
-function logMsg(message) { return '[publisher.github] ' + message; }
-// function throwError(message) { throw logMsg(message); }
 
 /**
  * MUST BIND `this`
