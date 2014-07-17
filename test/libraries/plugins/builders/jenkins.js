@@ -159,7 +159,7 @@ describe('plugins/builders/jenkins', function() {
         expect(res.project).to.eql('foobar');
         expect(res.repo).to.eql('foo/bar');
         expect(res.status).to.eql('queued');
-        expect(res.type).to.eql('jenkins');
+        expect(res.type).to.eql('queued');
         expect(triggerStub).to.have.been.calledOnce;
       });
     });
