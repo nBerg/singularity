@@ -47,7 +47,7 @@ function buildStatusPayload(payload) {
     status: payload.status,
     buildLink: payload.link,
     type: 'statusUpdate',
-    publishedMessage: ''
+    publishedMessage: payload.message || ''
   };
 }
 
@@ -86,7 +86,7 @@ module.exports = require('../plugin').extend({
         publisherPayload.sha,
         state,
         publisherPayload.buildLink,
-        publisherPayload.message
+        publisherPayload.publishedMessage
       );
     }.bind(this))
     .then(function(response) {
