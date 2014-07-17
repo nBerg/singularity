@@ -19,6 +19,7 @@ module.exports = createPayload = function(event, request) {
   return (new HttpPayload(request.body))
   .setName(event)
   .appendData('__headers', request.headers)
+  .appendData('type', 'http')
   .validate()
   .payload();
 };
@@ -31,7 +32,7 @@ module.exports.preparePayload = function(event, request) {
   catch(err) {
     throw {
       status: 422,
-      message: err.message
+      message: err.message || err
     };
   }
   return pl;

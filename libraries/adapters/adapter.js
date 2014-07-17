@@ -22,11 +22,11 @@ function validateHasPlugins() {
  * @param {String} plugin Name of the plugin
  * @return {Object} Config for plugin
  */
-function validatePluginCfg(plugin) {
-  if (!this.config.get(plugin)) {
-    throw 'No config for ' + this.name + '.' + plugin;
+function validatePluginCfg(adapter, plugin, config) {
+  if (!config[plugin]) {
+    throw 'No config for ' + adapter + '.' + plugin;
   }
-  return this.config.get(plugin);
+  return config[plugin];
 }
 
 /**
@@ -52,9 +52,10 @@ function internalPluginPath(type, name) {
  * @throws String when neither cfg path or internal path exists
  */
 function pathFromName(plugin) {
-  var cfgPath = this.config.get('plugin_path'),
-  filePath = internalPluginPath(this.pluginType, plugin);
-  cfgPath = fs.existsSync(cfgPath) ? cfgPath : false;
+  var cfgPath = this.config.plugin_path,
+      filePath = internalPluginPath(this.pluginType, plugin);
+      cfgPath = cfgPath && fs.existsSync(cfgPath) ? cfgPath : false;
+
   if (!cfgPath && !fs.existsSync(filePath)) {
     throw 'plugin_path cfg not defined (or does not exist) & ' +
       filePath +
@@ -69,9 +70,9 @@ function pathFromName(plugin) {
  *
  * @param {String} path Path of plugin to load
  */
-function loadFromPath(plugin, path) {
+function loadFromPath(plugin, path, config) {
   var Klass = require(path),
-  instance = new Klass(this.config.get(plugin));
+  instance = new Klass(config);
   instance.log = this.log;
   this.plugins.push(instance);
 }
@@ -93,29 +94,24 @@ module.exports = require('../vent').extend({
     if (!this.pluginType) {
       throw 'No pluginType defined';
     }
-    option = require('nconf').defaults(option);
     this._super(option);
     this.plugins = [];
     this.executeInPlugins = this.executeInPlugins.bind(this);
     this.publishPayload = this.publishPayload.bind(this);
     this.setChannel = this.setChannel.bind(this);
     this.setChannel(this.name);
-    // do I know what I'm doing? obviously not.
-    this.bound_fx = this.bound_fx || [];
-    this.bound_fx.forEach(function(fx) {
-      this[fx] = this[fx].bind(this);
-    }, this);
   },
 
   publishPayload: function(payload) {
     if (!payload) {
-      this.error('no payload given...?!');
+      this.debug('no payload given, ignoring');
       return;
     }
     if (!payload.type) {
-      this.error('payload has no type!', payload);
+      this.debug('payload has no type!', payload);
       return;
     }
+    this.debug('publishing', this.logForObject(payload));
     this.channel.publish(payload.type, payload);
   },
 
@@ -124,21 +120,12 @@ module.exports = require('../vent').extend({
    * If a `plugin` field exists, this fx will exclusively attempt
    * to load that plugin
    *
-   * @param {undefined | Object} cfg Defaults to this.config.get()
+   * @param {undefined | Object} customCfgs Defaults to this.config
    */
-  attachConfigPlugins: function(cfg) {
+  attachConfigPlugins: function(customCfgs) {
     var self = this,
-    plugins;
-
-    cfg = cfg || this.config.get();
-    if (cfg.plugin) {
-      plugins = Array.isArray(cfg.plugin) ? cfg.plugin : [cfg.plugin];
-    }
-    else {
-      plugins = Object.keys(cfg).filter(function(key) {
-        key !== 'plugin';
-      });
-    }
+        cfg = customCfgs || this.config,
+        plugins = this._getCfgPluginList(cfg);
 
     return q.allSettled(
       plugins.map(function(plugin) {
@@ -165,13 +152,12 @@ module.exports = require('../vent').extend({
    * @return {Promise}
    */
   attachPlugin: function(plugin) {
-    return q(plugin)
-    .then(validatePluginCfg.bind(this))
+    var pluginCfg = this.config[plugin];
+    return q([this.name, plugin, this.config])
+    .spread(validatePluginCfg)
     .thenResolve(plugin)
     .then(pathFromName.bind(this))
-    .then(function(path) {
-      return [plugin, path];
-    })
+    .then(function(path) { return [plugin, path, pluginCfg]; })
     .spread(loadFromPath.bind(this))
     .catch(this.error);
   },
@@ -193,6 +179,25 @@ module.exports = require('../vent').extend({
         .catch(plugin.error);
       })
     )
-    .then(q.all);
+    .then(q.all)
+    .catch(function(err) {
+      this.error(err);
+      return [];
+    }.bind(this));
+  },
+
+  /**
+   * @param {Object} cfg A cfg object with a 'plugin' property to read
+   * @return {Array} string names of plugins that this adapter *should*
+   *                 be able to recognize, assuming that everything was
+   *                 set up correctly
+   */
+  _getCfgPluginList: function(cfg) {
+    if (cfg.plugin) {
+      return Array.isArray(cfg.plugin) ? cfg.plugin : [cfg.plugin];
+    }
+    return Object.keys(cfg).filter(function(key) {
+      return key !== 'plugin';
+    });
   }
 });

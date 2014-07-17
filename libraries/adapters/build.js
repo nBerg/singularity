@@ -8,6 +8,7 @@ var q = require('q'),
 
 /**
  * @param {Object} buildPayload
+ * @return {Object} buildPayload
  */
 function validateBuildPayload(buildPayload) {
   new BuildPayload(buildPayload).validate();
@@ -16,10 +17,26 @@ function validateBuildPayload(buildPayload) {
 
 /**
  * @param {Object} vcsPayload
+ * @return {Object} vcsPayload
  */
 function validateVcsPayload(vcsPayload) {
   new VcsPayload(vcsPayload).validate();
   return vcsPayload;
+}
+
+/**
+ * MUST BIND `this`
+ * Plugin workflow to handle httpPayloads coming from build systems
+ * signaling state changes for builds
+ *
+ * @param {Object} httpPayload
+ * @param {Promise}
+ */
+function buildUpdate(httpPayload) {
+  return q(httpPayload)
+  .then(this.validateBuildUpdate.bind(this))
+  .then(this.createUpdatePayload.bind(this))
+  .then(validateBuildPayload);
 }
 
 /**
@@ -57,7 +74,7 @@ function buildProposalPayload(vcsPayload) {
 /**
  * MUST BIND `this`
  * Executes a given build plugin workflow (function to be executed in context of
- * plugin) given a VCS Payload
+ * plugin) given a Payload
  *
  * @param {Function} workflow Function to execute in context of plugins
  * @param {Object} payload either a change or proposal payload (vcs payload)
@@ -65,15 +82,27 @@ function buildProposalPayload(vcsPayload) {
  */
 function executeAndPublish(workflow, payload) {
   this.debug(
-    'request for build received',
+    'request for build adapter received',
      this.logForObject(payload)
   );
   return this.executeInPlugins(workflow, payload)
   .then(function(pluginResults) {
-    pluginResults.forEach(function(buildResults) {
+    pluginResults.filter(function(result) {
+      return !!result;
+    })
+    .forEach(function(buildResults) {
+      // VCS workflows can potentially trigger multiple build systems
+      // which is why they return arrays of buildPayloads
+      // buildStatus updates however, should only return a single response
+      // per build plugin (for the time being at least), which is why this
+      // check is here
+      if (!Array.isArray(buildResults)) {
+        buildResults = [buildResults];
+      }
+
       buildResults.forEach(function(buildPayload) {
         this.publishPayload(buildPayload);
-      });
+      }, this);
     }.bind(this));
   }.bind(this));
 }
@@ -91,5 +120,9 @@ module.exports = require('./adapter').extend({
 
   buildProposal: function(proposalPayload) {
     executeAndPublish.call(this, buildProposalPayload, proposalPayload);
+  },
+
+  handleBuildUpdate: function(httpPayload) {
+    executeAndPublish.call(this, buildUpdate, httpPayload);
   }
 });

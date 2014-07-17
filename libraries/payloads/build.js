@@ -5,16 +5,19 @@ module.exports.BuildPayload = require('./payload').extend({
 
   // TODO: flesh this out, this is just what the publisher needs
   required_fields: [
+      'cause',
       'artifacts',
       'buildId',
+      'host',
       'link',
-      'owner',
+      'project',
       'repo',
-      'sha',
-      'status'
+      'status',
+      'triggeringPayload'
   ],
   field_vals: {
-    //should this be the type?
-    status: ['queued', 'building', 'success', 'failure', 'error']
+    // also used as type (for jenkins plugin at least)
+    // 'finishing' is a NOOP (for jenkins plugin at least)
+    status: ['queued', 'building', 'success', 'failure', 'error', 'finishing']
   }
 });
