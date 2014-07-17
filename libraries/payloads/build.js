@@ -16,7 +16,8 @@ module.exports.BuildPayload = require('./payload').extend({
       'triggeringPayload'
   ],
   field_vals: {
-    //should this be the type?
-    status: ['queued', 'building', 'success', 'failure', 'error']
+    // also used as type (for jenkins plugin at least)
+    // 'finishing' is a NOOP (for jenkins plugin at least)
+    status: ['queued', 'building', 'success', 'failure', 'error', 'finishing']
   }
 });

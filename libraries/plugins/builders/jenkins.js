@@ -241,7 +241,8 @@ module.exports = require('../plugin').extend({
     if (httpPayload.build.phase === 'FINALIZED') {
       return (httpPayload.build.status === 'SUCCESS') ? 'success' : 'failure';
     }
-    throw 'build has not been finalized yet ' + this.logForObject(httpPayload);
+    this.debug('build has not been finalized: ' + this.logForObject(httpPayload));
+    return 'finishing';
   },
 
   /**
